@@ -184,7 +184,27 @@ configure_services() {
 }
 
 get_sources() {
-  scp dev-server:/home/suprunov/backup.crm.tar.gz /home/ssuprunov/backup.crm.tar.gz
+  mkdir -p /var/www/bitrix
+  scp dev-server:/home/bitrix/backup/backup.tar.gz /var/www/bitrix/backup.tar.gz
+}
+
+create_projects_structure() {
+  cd /var/www/bitrix
+  tar -xzf backup.crm.tar.gz
+  cd /var/www/bitrix/crm
+  ln -s ../_core/bitrix bitrix
+  ln -s ../_core/local local
+  ln -s ../_core/logs logs
+  ln -s ../_core/images images
+  ln -s ../_core/upload upload
+  ln -s ../_core/vendor vendor
+  cd ../wagnermaier
+  ln -s ../_core/bitrix bitrix
+  ln -s ../_core/local local
+  ln -s ../_core/logs logs
+  ln -s ../_core/images images
+  ln -s ../_core/upload upload
+  ln -s ../_core/vendor vendor
 }
 
 # Основная функция для выполнения всех действий
@@ -210,3 +230,6 @@ main() {
 
 # Вызов основной функции
 main
+
+
+
