@@ -91,7 +91,7 @@ add_sudoer_entry() {
         sudo cp /etc/sudoers /etc/sudoers.bak
     fi
     log "Добавление записи '${entry}' в /etc/sudoers..."
-    log "$entry" | sudo tee -a /etc/sudoers > /dev/null
+    echo "$entry" | sudo tee -a /etc/sudoers > /dev/null
 }
 
 
