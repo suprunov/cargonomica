@@ -2,81 +2,46 @@
 
 # curl -fsSL https://raw.githubusercontent.com/suprunov/cargonomica/master/installer -o installer && chmod +x installer && ./installer
 
-
 # Переменные для пользователей баз данных и текущего пользователя
-
 EMAIL="s.suprunov@cargonomica.com"
 NAME="Sergey Suprunov"
-
 LOCAL_MYSQL_USER="ssuprunov"
 LOCAL_MYSQL_PASSWORD="qazqaz012"
-
 LOCAL_PGSQL_USER="ssuprunov"
 LOCAL_PGSQL_PASSWORD="qazqaz012"
-
 DEV_SERVER_LOGIN="suprunov"
-
 TEST_SERVER_LOGIN="root"
-
 
 # Отключение запроса пароля для команд с sudo
 disable_sudo_ask_password() {
-    local sudoers_file="/etc/sudoers"
-    local sudoers_bak="/etc/sudoers.bak"
-
-    # Проверка на существование резервной копии
-    if [[ -f "$sudoers_bak" ]]; then
-        echo "Резервная копия $sudoers_bak существует. Восстанавливаю $sudoers_file..."
-        sudo cp "$sudoers_bak" "$sudoers_file"
-        exit 1
-    fi
-
-    # Создание резервной копии и изменение настроек
-    sudo cp "$sudoers_file" "$sudoers_bak"
-    sudo sed -i '/^%sudo/s/^/# /' "$sudoers_file"
-    if ! sudo grep -q '^%sudo ALL=(ALL) NOPASSWD: ALL' "$sudoers_file"; then
-        echo "%sudo ALL=(ALL) NOPASSWD: ALL" | sudo tee -a "$sudoers_file" > /dev/null
-    fi
-    if sudo visudo -c; then
-        echo "Файл $sudoers_file успешно обновлен."
-    else
-        echo "Ошибка в файле $sudoers_file. Восстанавливаю резервную копию."
-        sudo cp "$sudoers_bak" "$sudoers_file"
-        exit 1
-    fi
+    [[ -f /etc/sudoers.bak ]] && { echo "Резервная копия /etc/sudoers.bak существует. Восстанавливаю /etc/sudoers..."; sudo cp /etc/sudoers.bak /etc/sudoers; exit 1; }
+    sudo cp /etc/sudoers /etc/sudoers.bak
+    sudo sed -i '/^%sudo/s/^/# /' /etc/sudoers
+    [[ ! $(sudo grep -q '^%sudo ALL=(ALL) NOPASSWD: ALL' /etc/sudoers) ]] && echo "%sudo ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers > /dev/null
 }
-
 
 # Функция для обновления системы и установки базовых пакетов
 install_dependencies() {
-     echo "Обновление списка пакетов и установка базовых зависимостей..."
     sudo apt-get update && sudo apt-get upgrade -y
     sudo apt-get install -y software-properties-common curl wget lsb-release apt-transport-https
-    echo "Установка необходимых пакетов..."
     sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor msmtp rsync inotify-tools gawk jq wslu
     sudo add-apt-repository -y ppa:ondrej/php
     sudo apt-get update
-    # Устанавливаем PHP 8.2 и PHP-FPM
     sudo apt-get install -y php8.2 php8.2-fpm
-    # Устанавливаем необходимые PHP-расширения
     sudo apt-get install -y php8.2-cli php8.2-mysql php8.2-pgsql php8.2-redis php8.2-xml php8.2-mbstring php8.2-zip php8.2-curl php8.2-gd php8.2-soap php8.2-intl php8.2-bcmath php8.2-opcache php8.2-imap php8.2-xdebug php8.2-ldap php8.2-xmlrpc php8.2-readline php8.2-msgpack php8.2-igbinary
 }
 
 # Функция для создания пользователей MySQL и PostgreSQL с полными привилегиями
 create_db_users() {
-    echo "Создание пользователя MySQL..."
     sudo mysql -e "CREATE USER '${LOCAL_MYSQL_USER}'@'localhost' IDENTIFIED BY '${LOCAL_MYSQL_PASSWORD}';"
     sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO '${LOCAL_MYSQL_USER}'@'localhost' WITH GRANT OPTION;"
     sudo mysql -e "FLUSH PRIVILEGES;"
-    
-    echo "Создание пользователя PostgreSQL..."
     sudo -u postgres psql -c "CREATE USER ${LOCAL_PGSQL_USER} WITH PASSWORD '${LOCAL_PGSQL_PASSWORD}';"
     sudo -u postgres psql -c "ALTER USER ${LOCAL_PGSQL_USER} WITH SUPERUSER;"
 }
 
 # Функция для настройки сервисов после установки
 configure_services() {
-  echo "Настройка сервисов..."
     for service in php8.2-fpm nginx mysql postgresql redis-server supervisor; do
         sudo systemctl enable "$service"
         sudo systemctl start "$service"
@@ -85,10 +50,7 @@ configure_services() {
 
 # Функция для создания файла ~/.ssh/config от имени обычного пользователя
 setup_ssh() {
-    echo "Генерация SSH-ключа..."
     [[ ! -f ~/.ssh/id_rsa ]] && ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f ~/.ssh/id_rsa -N "" || echo "SSH-ключ уже существует."
-    
-    echo "Создание файла ~/.ssh/config..."
     mkdir -p ~/.ssh
     cat <<EOF > ~/.ssh/config
 Host gitlab
@@ -127,30 +89,23 @@ Host github
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
 EOF
-
-    chmod 700 ~/.ssh
-    chmod 600 ~/.ssh/id_rsa ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys ~/.ssh/config
-    chmod 644 ~/.ssh/id_rsa.pub ~/.ssh/known_hosts
-
-    echo "Отправка SSH-ключа на серверы..."
+    [ -d ~/.ssh ] && chmod 700 ~/.ssh
+    [ -f ~/.ssh/id_rsa ] && chmod 600 ~/.ssh/id_rsa
+    [ -f ~/.ssh/id_rsa.pub ] && chmod 644 ~/.ssh/id_rsa.pub
+    [ -f ~/.ssh/authorized_keys ] && chmod 600 ~/.ssh/authorized_keys
+    [ -f ~/.ssh/known_hosts ] && chmod 644 ~/.ssh/known_hosts
+    [ -f ~/.ssh/config ] && chmod 600 ~/.ssh/config
     ssh-copy-id dev-server
     ssh-copy-id test-server
-    
-    echo "Установка clip и копирование публичного ключа в буфер обмена..."
     [[ ! -f /usr/local/bin/clip ]] && sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip || echo "Символическая ссылка /usr/local/bin/clip уже существует."
     cat ~/.ssh/id_rsa.pub | clip
-    
-    echo "Ваш публичный ключ скопирован в буфер обмена."
-    echo "Пожалуйста, добавьте его на gitlab.cargonomica.com и github.com."
     wslview "https://gitlab.cargonomica.com/-/profile/keys"
     read -p "Нажмите [Enter], когда добавите ключ на https://gitlab.cargonomica.com/-/profile/keys..."
     wslview "https://github.com/settings/keys"
     read -p "Нажмите [Enter], когда добавите ключ на https://github.com/settings/keys..."
 }
 
-
 create_projects_structure() {
-    echo "Создание структуры проектов..."
     cd ~ || exit
     sudo chown -R "$USER:$USER" .
     [[ ! -d ~/www ]] && mkdir -p ~/www
@@ -158,8 +113,6 @@ create_projects_structure() {
     scp dev-server:/home/bitrix/backup/backup.tar.gz ~/www/backup.tar.gz
     tar -xzf backup.tar.gz
     rm -f ~/www/backup.tar.gz
-
-    # Создание символьных ссылок
     for project in crm wagnermaier main; do
         cd ~/www/"$project" || exit
         ln -s ../_core/bitrix bitrix
@@ -169,21 +122,18 @@ create_projects_structure() {
         ln -s ../_core/upload upload
         ln -s ../_core/vendor vendor
     done
-
     find ~/www -type d -exec chmod 2775 {} \;
     find ~/www -type f -exec chmod 664 {} \;
 }
 
-
 # Основная функция для выполнения всех действий
 main() {
-    setup_ssh
-    disable_sudo_ask_password
+    disable_sudo_ask_password    
     install_dependencies
     create_db_users
     configure_services
+    setup_ssh
     create_projects_structure
 }
 
-# Вызов основной функции
-main "$@"
+main
