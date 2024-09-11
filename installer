@@ -9,8 +9,9 @@ LOCAL_MYSQL_PASSWORD="qazqaz012"
 LOCAL_PGSQL_USER="ssuprunov"
 LOCAL_PGSQL_PASSWORD="qazqaz012"
 DEV_SERVER_LOGIN="suprunov"
+DEV_SERVER_PASSWORD="Rfkeu@495"
 TEST_SERVER_LOGIN="root"
-
+TEST_SERVER_PASSWORD="HdfyfzHfyf_2034"
 
 # Данные репозиториев
 declare -A repos
@@ -77,69 +78,20 @@ log() {
     echo "$(date +'%Y-%m-%d %H:%M:%S') - ${message}" | tee -a /home/$USER/installer.log
 }
 
-# Функция для отката изменений
-down() {
-    log "Начинаю откат изменений..."
-
-    # Восстановление /etc/sudoers из резервной копии, если она существует
-    if [[ -f /etc/sudoers.bak ]]; then
-        log "Восстановление файла /etc/sudoers..."
-        sudo cp /etc/sudoers.bak /etc/sudoers
-    fi
-
-    # Удаление созданных пользователей MySQL и PostgreSQL
-    log "Удаление пользователей баз данных..."
-    sudo mysql -e "DROP USER IF EXISTS '${LOCAL_MYSQL_USER}'@'localhost';"
-    sudo -u postgres psql -c "DROP USER IF EXISTS ${LOCAL_PGSQL_USER};"
-
-    # Остановка и отключение сервисов
-    log "Остановка и отключение сервисов..."
-    for service in php8.2-fpm nginx mysql postgresql redis-server supervisor; do
-        sudo systemctl stop "$service"
-        sudo systemctl disable "$service"
-    done
-
-    # Удаление созданных директорий и символических ссылок
-    log "Удаление директорий и символических ссылок..."
-    rm -rf /home/$USER/www
-
-    # Удаление SSH-ключей
-    log "Удаление SSH-ключей..."
-    rm -f /home/$USER/.ssh/id_rsa /home/$USER/.ssh/id_rsa.pub /home/$USER/.ssh/config
-
-    # Удаление установленных зависимостей
-    log "Удаление установленных зависимостей..."
-    sudo apt-get remove --purge -y php8.2 php8.2-fpm php8.2-cli php8.2-mysql php8.2-pgsql php8.2-redis php8.2-xml php8.2-mbstring php8.2-zip php8.2-curl php8.2-gd php8.2-soap php8.2-intl php8.2-bcmath php8.2-opcache php8.2-imap php8.2-xdebug php8.2-ldap php8.2-xmlrpc php8.2-readline php8.2-msgpack php8.2-igbinary
-    sudo apt-get autoremove -y
-    sudo apt-get clean
-
-    log "Откат завершен."
-}
-
-
-
-
-
 # Функция для добавления строки в /etc/sudoers
 add_sudoer_entry() {
     local user="$1"
     local entry="${user} ALL=(ALL) NOPASSWD: ALL"
-
-    # Проверка, что строка уже существует в /etc/sudoers
     if sudo grep -q "^${entry}$" /etc/sudoers; then
-        echo "Запись '${entry}' уже существует в /etc/sudoers."
+        log "Запись '${entry}' уже существует в /etc/sudoers."
         return
     fi
-
-    # Проверка, что резервная копия /etc/sudoers.bak существует
     if [[ ! -f /etc/sudoers.bak ]]; then
-        echo "Создание резервной копии /etc/sudoers..."
+        log "Создание резервной копии /etc/sudoers..."
         sudo cp /etc/sudoers /etc/sudoers.bak
     fi
-
-    # Добавление записи в /etc/sudoers
-    echo "Добавление записи '${entry}' в /etc/sudoers..."
-    echo "$entry" | sudo tee -a /etc/sudoers > /dev/null
+    log "Добавление записи '${entry}' в /etc/sudoers..."
+    log "$entry" | sudo tee -a /etc/sudoers > /dev/null
 }
 
 
@@ -148,7 +100,8 @@ install_dependencies() {
     log "Обновление системы и установка зависимостей..."
     sudo apt-get update && sudo apt-get upgrade -y
     sudo apt-get install -y software-properties-common curl wget lsb-release apt-transport-https
-    sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor msmtp rsync inotify-tools gawk jq wslu
+    sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor rsync inotify-tools gawk jq wslu sshpass
+    DEBIAN_FRONTEND=noninteractive sudo apt-get install -y msmtp
     sudo add-apt-repository -y ppa:ondrej/php
     sudo apt-get update
     sudo apt-get install -y php8.2 php8.2-fpm
@@ -172,6 +125,18 @@ configure_services() {
         sudo systemctl enable "$service"
         sudo systemctl start "$service"
     done
+
+#     sudo cat << EOF >> /etc/msmtprc
+# account default
+# host smtp.your-email-provider.com
+# port 587
+# auth on
+# user your-email@your-domain.com
+# password your-password
+# tls on
+# tls_trust_file /etc/ssl/certs/ca-certificates.crt
+# EOF
+
 }
 
 # Функция для создания файла /home/$USER/.ssh/config от имени обычного пользователя
@@ -179,7 +144,7 @@ setup_ssh() {
     log "Настройка SSH..."
     [[ ! -f /home/$USER/.ssh/id_rsa ]] && ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f /home/$USER/.ssh/id_rsa -N "" || log "SSH-ключ уже существует."
     mkdir -p /home/$USER/.ssh
-    cat <<EOF > /home/$USER/.ssh/config
+    cat << EOF >> "/home/$USER/.ssh/config"
 Host gitlab
     HostName gitlab.cargonomica.com
     User git
@@ -207,14 +172,6 @@ Host test-server
     ServerAliveInterval 60
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-Host github
-    HostName github.com
-    User git
-    IdentityFile /home/$USER/.ssh/id_rsa
-    Compression yes
-    ServerAliveInterval 60
-    StrictHostKeyChecking no
-    UserKnownHostsFile=/dev/null
 EOF
     [ -d /home/$USER/.ssh ] && chmod 700 /home/$USER/.ssh
     [ -f /home/$USER/.ssh/id_rsa ] && chmod 600 /home/$USER/.ssh/id_rsa
@@ -222,14 +179,12 @@ EOF
     [ -f /home/$USER/.ssh/authorized_keys ] && chmod 600 /home/$USER/.ssh/authorized_keys
     [ -f /home/$USER/.ssh/known_hosts ] && chmod 644 /home/$USER/.ssh/known_hosts
     [ -f /home/$USER/.ssh/config ] && chmod 600 /home/$USER/.ssh/config
-    ssh-copy-id dev-server
-    ssh-copy-id test-server
+    sshpass -p $DEV_SERVER_PASSWORD ssh-copy-id dev-server
+    sshpass -p $TEST_SERVER_PASSWORD ssh-copy-id test-server
     [[ ! -f /usr/local/bin/clip ]] && sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip || log "Символическая ссылка /usr/local/bin/clip уже существует."
     cat /home/$USER/.ssh/id_rsa.pub | clip
     wslview "https://gitlab.cargonomica.com/-/profile/keys"
     read -p "Нажмите [Enter], когда добавите ключ на https://gitlab.cargonomica.com/-/profile/keys..."
-    wslview "https://github.com/settings/keys"
-    read -p "Нажмите [Enter], когда добавите ключ на https://github.com/settings/keys..."
 }
 
 create_projects_structure() {
@@ -254,20 +209,6 @@ create_projects_structure() {
     find /home/$USER/www -type f -exec chmod 664 {} \;
 }
 
-# Основная функция для выполнения всех действий
-up() {
-    log "Начинаю выполнение скрипта..."
-    #update_deps
-    # install_dependencies
-    # create_db_users
-    # configure_services
-    # setup_ssh
-    # create_projects_structure
-
-    git_settings
-    log "Скрипт выполнен успешно."
-}
-
 update_deps() {
     sudo apt update
     sudo apt upgrade -y
@@ -286,15 +227,13 @@ git_settings() {
         git config user.email "${EMAIL}"
         git config color.ui auto
         git config advice.ignoredHook false
-        # git config color.ui always
-        cd "${repos["$repo.local"]}/.git/hooks"
-        tee "post-checkout" > /dev/null <<EOF
+        cat << EOF >> "${repos["$repo.local"]}/.git/hooks/post-checkout"
 #!/bin/bash
 find . -type f -exec chmod 664 {} \;
 find . -type d -exec chmod 2775 {} \;
 EOF
-        chmod +x "post-checkout"
-        tee "prepare-commit-msg" > /dev/null <<EOF
+        chmod +x "${repos["$repo.local"]}/.git/hooks/post-checkout"
+        cat << EOF >> "${repos["$repo.local"]}/.git/hooks/prepare-commit-msg"
 #!/bin/bash
 BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
 COMMIT_MSG_FILE=$1
@@ -302,7 +241,7 @@ if ! grep -q "\[$BRANCH_NAME\]" "$COMMIT_MSG_FILE"; then
   sed -i.bak -e "1s|^|[$BRANCH_NAME] |" "$COMMIT_MSG_FILE"
 fi
 EOF
-        chmod +x "prepare-commit-msg"
+        chmod +x "${repos["$repo.local"]}/.git/hooks/prepare-commit-msg"
         cd "${repos["$repo.local"]}"
         if [ "${repos["$repo.update"]}" = "true" ]; then
             git checkout .
@@ -318,55 +257,36 @@ EOF
         # echo "sync: ${repos["$repo.sync"]}"
         # echo "hasky: ${repos["$repo.hasky"]}"
         # echo "update: ${repos["$repo.update"]}"
-        # echo "----------------------------"
         git status
         echo "----------------------------"
         echo "----------------------------"
     done
 }
 
-
 set_locale() {
     sudo locale-gen ru_RU.UTF-8
     sudo update-locale LANG=ru_RU.UTF-8
-    sudo tee /etc/default/console-setup > /dev/null <<EOF
+    sudo cat << EOF >> /etc/default/console-setup
 CHARMAP="UTF-8"
 CODESET="CyrSlav"
 FONTFACE="Terminus"
 FONTSIZE="16x32"
 EOF
-
-    sudo tee /etc/default/keyboard > /dev/null <<EOF
+    sudo cat << EOF >> /etc/default/keyboard
 XKBLAYOUT="us,ru"
 XKBVARIANT=""
 XKBOPTIONS="grp:alt_shift_toggle"
 EOF
-    sudo dpkg-reconfigure console-setup
+    DEBIAN_FRONTEND=noninteractive sudo dpkg-reconfigure console-setup
 }
 
-# Основная функция для обработки параметров
-main() {
-    while getopts "ud" opt; do
-        case ${opt} in
-            u)
-                up
-                ;;
-            d)
-                down
-                ;;
-            *)
-                echo "Использование: $0 [-u] [-d]"
-                exit 1
-                ;;
-        esac
-    done
-
-    # Если не указан ни один параметр, вывести сообщение
-    if [[ $OPTIND -eq 1 ]]; then
-        echo "Использование: $0 [-u] [-d]"
-        exit 1
-    fi
-}
-
-# Запуск основной функции
-main "$@"
+# Выполнение всех действий
+log "Начинаю выполнение скрипта..."
+update_deps
+install_dependencies
+create_db_users
+configure_services
+setup_ssh
+create_projects_structure
+git_settings
+log "Скрипт выполнен успешно."
