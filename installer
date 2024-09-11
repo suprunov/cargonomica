@@ -23,6 +23,14 @@ disable_sudo_ask_password() {
     local sudoers_file="/etc/sudoers"
     local sudoers_bak="/etc/sudoers.bak"
 
+    # Проверка на существование резервной копии
+    if [[ -f "$sudoers_bak" ]]; then
+        echo "Резервная копия $sudoers_bak существует. Восстанавливаю $sudoers_file..."
+        sudo cp "$sudoers_bak" "$sudoers_file"
+        exit 1
+    fi
+
+    # Создание резервной копии и изменение настроек
     sudo cp "$sudoers_file" "$sudoers_bak"
     sudo sed -i '/^%sudo/s/^/# /' "$sudoers_file"
     if ! sudo grep -q '^%sudo ALL=(ALL) NOPASSWD: ALL' "$sudoers_file"; then
@@ -36,6 +44,7 @@ disable_sudo_ask_password() {
         exit 1
     fi
 }
+
 
 # Функция для обновления системы и установки базовых пакетов
 install_dependencies() {
