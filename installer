@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# /bin/bash -c "$(curl -fsSLhttps://raw.githubusercontent.com/suprunov/cargonomica/master/installer)"
+# sudo apt update && sudo apt upgrade -y && /bin/bash -c "$(curl -fsSLhttps://raw.githubusercontent.com/suprunov/cargonomica/master/installer)"
 
 # Переменные для пользователей баз данных и текущего пользователя
 
