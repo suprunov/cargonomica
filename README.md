@@ -66,3 +66,37 @@
 2. Перезагрузите систему или переключитесь на консоль (Ctrl + Alt + F3) и проверьте, отображаются ли русские символы корректно.
 
 Теперь консоль Ubuntu должна поддерживать русский язык и переключение раскладки клавиатуры.
+
+
+
+------ git
+установка прав после checkout
+mcedit .git/hooks/post-checkout #>>>
+```bash
+#!/bin/bash
+find . -type f -exec chmod 664 {} \;
+find . -type d -exec chmod 2775 {} \;
+```
+```bash
+chmod +x .git/hooks/post-checkout
+```
+
+
+
+Автоматическое добавление название ветки в начало сообщения коммита:
+mcedit  .git/hooks/prepare-commit-msg #>>>
+```bash
+#!/bin/bash
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+COMMIT_MSG_FILE=$1
+if ! grep -q "\[$BRANCH_NAME\]" "$COMMIT_MSG_FILE"; then
+  sed -i.bak -e "1s|^|[$BRANCH_NAME] |" "$COMMIT_MSG_FILE"
+fi
+```
+```bash
+chmod +x .git/hooks/prepare-commit-msg
+```
+
+
+
+
