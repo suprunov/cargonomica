@@ -16,48 +16,60 @@ TEST_SERVER_PASSWORD="HdfyfzHfyf_2034"
 # Данные репозиториев
 declare -A repos
 repos["crm.name"]="CRM (crm.cargonomica.com)"
-repos["crm.remote"]="git@gitlab:bitrix-php/crm.git"
+repos["crm.git"]="git@gitlab:bitrix-php/crm.git"
 repos["crm.local"]="/home/$USER/www/crm"
+repos["crm.remote"]="/home/bitrix/ext_www/p3.crm.b24dev.corp.ppricep.ru"
+repos["crm.url"]="https://p3.crm.b24dev.corp.ppricep.ru"
 repos["crm.common"]="false"
 repos["crm.sync"]="true"
 repos["crm.hasky"]="true"
 repos["crm.update"]="true"
 
 repos["wagnermaier.name"]="wagnermaier (wagnermaier.com)"
-repos["wagnermaier.remote"]="git@gitlab:bitrix-php/wagnermaier.git"
+repos["wagnermaier.git"]="git@gitlab:bitrix-php/wagnermaier.git"
 repos["wagnermaier.local"]="/home/$USER/www/wagnermaier"
+repos["wagnermaier.remote"]="/home/bitrix/ext_www/p3.wagnermaier.b24dev.corp.ppricep.ru"
+repos["wagnermaier.url"]="https://p3.wagnermaier.b24dev.corp.ppricep.ru"
 repos["wagnermaier.common"]="false"
 repos["wagnermaier.sync"]="true"
 repos["wagnermaier.hasky"]="true"
 repos["wagnermaier.update"]="true"
 
 # repos["main.name"]="main (cargonomica.com)"
-# repos["main.remote"]="git@gitlab:bitrix-php/cargonomica-main.git"
+# repos["main.git"]="git@gitlab:bitrix-php/cargonomica-main.git"
 # repos["main.local"]="/home/$USER/www/main"
+# repos["main.remote"]="/home/bitrix/ext_www/p3.b24dev.corp.ppricep.ru"
+# repos["main.url"]="https://p3.b24dev.corp.ppricep.ru"
 # repos["main.common"]="false"
 # repos["main.sync"]="true"
 # repos["main.hasky"]="true"
 # repos["main.update"]="true"
 
 repos["local.name"]="local (project/local)"
-repos["local.remote"]="git@gitlab:bitrix-php/core-local.git"
+repos["local.git"]="git@gitlab:bitrix-php/core-local.git"
 repos["local.local"]="/home/$USER/www/_core/local"
+repos["local.remote"]="/home/bitrix/p3.core/local"
+repos["local.url"]=""
 repos["local.common"]="true"
 repos["local.sync"]="true"
 repos["local.hasky"]="true"
 repos["local.update"]="true"
 
 repos["bitrix.name"]="bitrix (project/bitrix)"
-repos["bitrix.remote"]="git@gitlab:bitrix-php/core-bitrix.git"
+repos["bitrix.git"]="git@gitlab:bitrix-php/core-bitrix.git"
 repos["bitrix.local"]="/home/$USER/www/_core/bitrix"
+repos["bitrix.remote"]="/home/bitrix/p3.core/bitrix"
+repos["bitrix.url"]=""
 repos["bitrix.common"]="true"
 repos["bitrix.sync"]="false"
 repos["bitrix.hasky"]="false"
 repos["bitrix.update"]="false"
 
 repos["vendor.name"]="vendor (project/vendor)"
-repos["vendor.remote"]="git@gitlab:bitrix-php/core-vendor.git"
+repos["vendor.git"]="git@gitlab:bitrix-php/core-vendor.git"
 repos["vendor.local"]="/home/$USER/www/_core/vendor"
+repos["vendor.remote"]="/home/bitrix/p3.core/vendor"
+repos["vendor.url"]=""
 repos["vendor.common"]="true"
 repos["vendor.sync"]="true"
 repos["vendor.hasky"]="false"
@@ -223,7 +235,7 @@ git_settings() {
     for repo in "${repos_list[@]}"; do
         log "Настройка репозитория ${repos["$repo.name"]}"
         cd "${repos["$repo.local"]}" || exit
-        git remote set-url origin ${repos["$repo.remote"]}
+        git remote set-url origin ${repos["$repo.git"]}
         git remote -v
         git config user.name "${NAME}"
         git config user.email "${EMAIL}"
@@ -251,9 +263,24 @@ EOF
             git fetch --all
             git checkout -B develop origin/develop
         fi
+
+        if [ "${repos["$repo.sync"]}" = "true" ]; then
+            sudo cat << EOF >> "/home/${USER}/gsync/.${repo}.gsync"
+[OPTIONS]
+source="${repos["${repo}.local"]}"
+target="dev-server:${repos["${repo}.remote"]}" 
+links=true
+perms=false 
+times=true 
+group=false
+owner=false
+EOF
+        fi
+
+
         # echo "Processing $repo:"
         # echo "name: ${repos["$repo.name"]}"
-        # echo "remote: ${repos["$repo.remote"]}"
+        # echo "remote: ${repos["$repo.git"]}"
         # echo "local: ${repos["$repo.local"]}"
         # echo "common: ${repos["$repo.common"]}"
         # echo "sync: ${repos["$repo.sync"]}"
@@ -298,13 +325,32 @@ EOF
     source ~/.bashrc
 }
 
+install_node() {
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+    nvm install 22
+    node -v
+    npm -v
+    curl -fsSL https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+    echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+    sudo apt update
+    sudo apt install -y yarn
+}
+
+install_rsync() {
+    git clone https://github.com/e-bash/gsync.git
+    cd gsync
+    chmod +x gsync
+}
+
 # Выполнение всех действий
 log "Начинаю выполнение скрипта..."
 update_deps
 install_dependencies
+install_node
 create_db_users
 configure_services
 setup_ssh
 create_projects_structure
 git_settings
+install_rsync
 log "Скрипт выполнен успешно."
