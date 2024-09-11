@@ -100,8 +100,8 @@ install_dependencies() {
     log "Обновление системы и установка зависимостей..."
     sudo apt-get update && sudo apt-get upgrade -y
     sudo apt-get install -y software-properties-common curl wget lsb-release apt-transport-https
-    sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor rsync inotify-tools gawk jq wslu sshpass
-    DEBIAN_FRONTEND=noninteractive sudo apt-get install -y msmtp
+    sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor rsync inotify-tools gawk jq wslu sshpass msmtp
+    # DEBIAN_FRONTEND=noninteractive sudo apt-get install -y msmtp
     sudo add-apt-repository -y ppa:ondrej/php
     sudo apt-get update
     sudo apt-get install -y php8.2 php8.2-fpm
@@ -277,7 +277,12 @@ XKBLAYOUT="us,ru"
 XKBVARIANT=""
 XKBOPTIONS="grp:alt_shift_toggle"
 EOF
-    DEBIAN_FRONTEND=noninteractive sudo dpkg-reconfigure console-setup
+    #DEBIAN_FRONTEND=noninteractive sudo dpkg-reconfigure console-setup
+    sudo dpkg-reconfigure console-setup
+    echo 'export LANG=ru_RU.UTF-8' >> ~/.bashrc
+    git config --global i18n.commitEncoding "UTF-8"
+    git config --global i18n.logOutputEncoding "UTF-8"
+
 }
 
 # Выполнение всех действий
