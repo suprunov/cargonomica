@@ -1,6 +1,49 @@
 #!/bin/bash
 
-# curl -fsSL https://raw.githubusercontent.com/suprunov/cargonomica/master/installer -o installer && chmod +x installer && ./installer
+# Функция для логирования
+log() {
+    local message="$1"
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - ${message}" | tee -a ~/installer.log
+}
+
+# Функция для отката изменений
+down() {
+    log "Начинаю откат изменений..."
+
+    # Восстановление /etc/sudoers из резервной копии, если она существует
+    if [[ -f /etc/sudoers.bak ]]; then
+        log "Восстановление файла /etc/sudoers..."
+        sudo cp /etc/sudoers.bak /etc/sudoers
+    fi
+
+    # Удаление созданных пользователей MySQL и PostgreSQL
+    log "Удаление пользователей баз данных..."
+    sudo mysql -e "DROP USER IF EXISTS '${LOCAL_MYSQL_USER}'@'localhost';"
+    sudo -u postgres psql -c "DROP USER IF EXISTS ${LOCAL_PGSQL_USER};"
+
+    # Остановка и отключение сервисов
+    log "Остановка и отключение сервисов..."
+    for service in php8.2-fpm nginx mysql postgresql redis-server supervisor; do
+        sudo systemctl stop "$service"
+        sudo systemctl disable "$service"
+    done
+
+    # Удаление созданных директорий и символических ссылок
+    log "Удаление директорий и символических ссылок..."
+    rm -rf ~/www
+
+    # Удаление SSH-ключей
+    log "Удаление SSH-ключей..."
+    rm -f ~/.ssh/id_rsa ~/.ssh/id_rsa.pub ~/.ssh/config
+
+    # Удаление установленных зависимостей
+    log "Удаление установленных зависимостей..."
+    sudo apt-get remove --purge -y php8.2 php8.2-fpm php8.2-cli php8.2-mysql php8.2-pgsql php8.2-redis php8.2-xml php8.2-mbstring php8.2-zip php8.2-curl php8.2-gd php8.2-soap php8.2-intl php8.2-bcmath php8.2-opcache php8.2-imap php8.2-xdebug php8.2-ldap php8.2-xmlrpc php8.2-readline php8.2-msgpack php8.2-igbinary
+    sudo apt-get autoremove -y
+    sudo apt-get clean
+
+    log "Откат завершен."
+}
 
 # Переменные для пользователей баз данных и текущего пользователя
 EMAIL="s.suprunov@cargonomica.com"
@@ -14,7 +57,7 @@ TEST_SERVER_LOGIN="root"
 
 # Отключение запроса пароля для команд с sudo
 disable_sudo_ask_password() {
-    [[ -f /etc/sudoers.bak ]] && { echo "Резервная копия /etc/sudoers.bak существует. Восстанавливаю /etc/sudoers..."; sudo cp /etc/sudoers.bak /etc/sudoers; exit 1; }
+    [[ -f /etc/sudoers.bak ]] && { log "Резервная копия /etc/sudoers.bak существует. Восстанавливаю /etc/sudoers..."; sudo cp /etc/sudoers.bak /etc/sudoers; exit 1; }
     sudo cp /etc/sudoers /etc/sudoers.bak
     sudo sed -i '/^%sudo/s/^/# /' /etc/sudoers
     [[ ! $(sudo grep -q '^%sudo ALL=(ALL) NOPASSWD: ALL' /etc/sudoers) ]] && echo "%sudo ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers > /dev/null
@@ -22,6 +65,7 @@ disable_sudo_ask_password() {
 
 # Функция для обновления системы и установки базовых пакетов
 install_dependencies() {
+    log "Обновление системы и установка зависимостей..."
     sudo apt-get update && sudo apt-get upgrade -y
     sudo apt-get install -y software-properties-common curl wget lsb-release apt-transport-https
     sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor msmtp rsync inotify-tools gawk jq wslu
@@ -33,6 +77,7 @@ install_dependencies() {
 
 # Функция для создания пользователей MySQL и PostgreSQL с полными привилегиями
 create_db_users() {
+    log "Создание пользователей баз данных..."
     sudo mysql -e "CREATE USER '${LOCAL_MYSQL_USER}'@'localhost' IDENTIFIED BY '${LOCAL_MYSQL_PASSWORD}';"
     sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO '${LOCAL_MYSQL_USER}'@'localhost' WITH GRANT OPTION;"
     sudo mysql -e "FLUSH PRIVILEGES;"
@@ -42,6 +87,7 @@ create_db_users() {
 
 # Функция для настройки сервисов после установки
 configure_services() {
+    log "Настройка сервисов..."
     for service in php8.2-fpm nginx mysql postgresql redis-server supervisor; do
         sudo systemctl enable "$service"
         sudo systemctl start "$service"
@@ -50,7 +96,8 @@ configure_services() {
 
 # Функция для создания файла ~/.ssh/config от имени обычного пользователя
 setup_ssh() {
-    [[ ! -f ~/.ssh/id_rsa ]] && ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f ~/.ssh/id_rsa -N "" || echo "SSH-ключ уже существует."
+    log "Настройка SSH..."
+    [[ ! -f ~/.ssh/id_rsa ]] && ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f ~/.ssh/id_rsa -N "" || log "SSH-ключ уже существует."
     mkdir -p ~/.ssh
     cat <<EOF > ~/.ssh/config
 Host gitlab
@@ -97,7 +144,7 @@ EOF
     [ -f ~/.ssh/config ] && chmod 600 ~/.ssh/config
     ssh-copy-id dev-server
     ssh-copy-id test-server
-    [[ ! -f /usr/local/bin/clip ]] && sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip || echo "Символическая ссылка /usr/local/bin/clip уже существует."
+    [[ ! -f /usr/local/bin/clip ]] && sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip || log "Символическая ссылка /usr/local/bin/clip уже существует."
     cat ~/.ssh/id_rsa.pub | clip
     wslview "https://gitlab.cargonomica.com/-/profile/keys"
     read -p "Нажмите [Enter], когда добавите ключ на https://gitlab.cargonomica.com/-/profile/keys..."
@@ -106,6 +153,7 @@ EOF
 }
 
 create_projects_structure() {
+    log "Создание структуры проектов..."
     cd ~ || exit
     sudo chown -R "$USER:$USER" .
     [[ ! -d ~/www ]] && mkdir -p ~/www
@@ -113,7 +161,7 @@ create_projects_structure() {
     scp dev-server:/home/bitrix/backup/backup.tar.gz ~/www/backup.tar.gz
     tar -xzf backup.tar.gz
     rm -f ~/www/backup.tar.gz
-    for project in crm wagnermaier main; do
+    for project in crm wagnermaier; do
         cd ~/www/"$project" || exit
         ln -s ../_core/bitrix bitrix
         ln -s ../_core/local local
@@ -127,13 +175,40 @@ create_projects_structure() {
 }
 
 # Основная функция для выполнения всех действий
-main() {
+up() {
+    log "Начинаю выполнение скрипта..."
     disable_sudo_ask_password    
     install_dependencies
     create_db_users
     configure_services
     setup_ssh
     create_projects_structure
+    log "Скрипт выполнен успешно."
 }
 
-main
+# Основная функция для обработки параметров
+main() {
+    while getopts "ud" opt; do
+        case ${opt} in
+            u)
+                up
+                ;;
+            d)
+                down
+                ;;
+            *)
+                echo "Использование: $0 [-u] [-d]"
+                exit 1
+                ;;
+        esac
+    done
+
+    # Если не указан ни один параметр, вывести сообщение
+    if [[ $OPTIND -eq 1 ]]; then
+        echo "Использование: $0 [-u] [-d]"
+        exit 1
+    fi
+}
+
+# Запуск основной функции
+main "$@"
