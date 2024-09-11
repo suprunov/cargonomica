@@ -1,5 +1,5 @@
 #!/bin/bash
-# curl -fsSL https://raw.githubusercontent.com/suprunov/cargonomica/master/installer -o installer && chmod +x installer && ./installer
+# sudo apt update && sudo apt upgrade -y && curl -fsSL https://raw.githubusercontent.com/suprunov/cargonomica/master/installer -o installer && chmod +x installer && ./installer
 
 # Функция для логирования
 log() {
