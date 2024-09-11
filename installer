@@ -218,6 +218,8 @@ update_deps() {
 }
 
 git_settings() {
+    curl -o ~/.git-prompt.sh https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh
+    
     for repo in "${repos_list[@]}"; do
         log "Настройка репозитория ${repos["$repo.name"]}"
         cd "${repos["$repo.local"]}" || exit
