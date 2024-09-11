@@ -206,7 +206,7 @@ create_projects_structure() {
     [[ ! -d /home/$USER/www ]] && mkdir -p /home/$USER/www
     cd /home/$USER/www || exit
     scp dev-server:/home/bitrix/backup/backup.tar.gz /home/$USER/www/backup.tar.gz
-    tar -xzf backup.tar.gz
+    tar -xvzf backup.tar.gz
     rm -f /home/$USER/www/backup.tar.gz
     for project in crm wagnermaier; do
         cd /home/$USER/www/"$project" || exit
