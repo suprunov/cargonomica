@@ -1,0 +1,212 @@
+#!/bin/bash
+
+# Переменные для пользователей баз данных и текущего пользователя
+DB_USER="ssuprunov"
+DB_PASSWORD="qazqaz012"
+NON_ROOT_USER="ssuprunov"  # Укажите имя пользователя здесь
+
+# Функция для проверки прав суперпользователя
+check_root() {
+  if [[ $EUID -ne 0 ]]; then
+    echo "Скрипт требует права администратора. Перезапуск с sudo..."
+    exec sudo bash "$0" "$@"
+  fi
+}
+
+# Функция для создания резервной копии файла /etc/sudoers
+backup_sudoers() {
+  cp /etc/sudoers /etc/sudoers.bak
+}
+
+# Функция для комментирования строки, начинающейся с %sudo
+comment_sudo_line() {
+  sed -i '/^%sudo/s/^/# /' /etc/sudoers
+}
+
+# Функция для добавления строки '%sudo ALL=(ALL) NOPASSWD: ALL'
+add_sudo_nopasswd() {
+  if ! grep -q '^%sudo ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; then
+    echo "%sudo ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+  fi
+}
+
+# Функция для проверки синтаксических ошибок в файле /etc/sudoers
+validate_sudoers() {
+  if visudo -c; then
+    echo "Файл /etc/sudoers успешно обновлен."
+  else
+    echo "Ошибка в файле /etc/sudoers. Восстанавливаю резервную копию."
+    cp /etc/sudoers.bak /etc/sudoers
+    exit 1
+  fi
+}
+
+# Функция для обновления системы и установки базовых пакетов
+install_dependencies() {
+  echo "Обновление списка пакетов и установка базовых зависимостей..."
+  apt-get update && apt-get upgrade -y
+  apt-get install -y software-properties-common curl wget lsb-release apt-transport-https
+}
+
+# Функция для установки MC, Nginx, MySQL, PostgreSQL, Redis, Git, Composer и других
+install_packages() {
+  echo "Установка необходимых пакетов..."
+  apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor msmtp rsync inotify-tools gawk
+}
+
+# Функция для установки PHP 8.2 и необходимых PHP-расширений
+install_php() {
+  echo "Установка PHP 8.2 и необходимых расширений..."
+
+  # Добавляем репозиторий для PHP 8.2
+  add-apt-repository -y ppa:ondrej/php
+  apt-get update
+
+  # Устанавливаем PHP 8.2 и PHP-FPM
+  apt-get install -y php8.2 php8.2-fpm
+
+  # Устанавливаем необходимые PHP-расширения
+  apt-get install -y php8.2-cli php8.2-mysql php8.2-pgsql php8.2-redis php8.2-xml php8.2-mbstring php8.2-zip php8.2-curl php8.2-gd php8.2-soap php8.2-intl php8.2-bcmath php8.2-opcache php8.2-imap php8.2-xdebug php8.2-ldap php8.2-xmlrpc php8.2-readline php8.2-msgpack php8.2-igbinary
+}
+
+# Функция для создания пользователя MySQL с полными привилегиями
+create_mysql_user() {
+  echo "Создание пользователя MySQL..."
+  
+  mysql -e "CREATE USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';"
+  mysql -e "GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'localhost' WITH GRANT OPTION;"
+  mysql -e "FLUSH PRIVILEGES;"
+}
+
+# Функция для создания пользователя PostgreSQL с полными привилегиями
+create_postgresql_user() {
+  echo "Создание пользователя PostgreSQL..."
+  
+  sudo -u postgres psql -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';"
+  sudo -u postgres psql -c "ALTER USER ${DB_USER} WITH SUPERUSER;"
+}
+
+# Функция для создания SSH-ключа от имени обычного пользователя
+generate_ssh_key() {
+  echo "Генерация SSH-ключа..."
+
+  su - $NON_ROOT_USER -c 'if [[ ! -f ~/.ssh/id_rsa ]]; then ssh-keygen -t rsa -b 4096 -C "s.suprunov@cargonomica.com" -f ~/.ssh/id_rsa -N ""; else echo "SSH-ключ уже существует."; fi'
+}
+
+# Функция для создания файла ~/.ssh/config от имени обычного пользователя
+setup_ssh_config() {
+  echo "Создание файла ~/.ssh/config..."
+
+  su - $NON_ROOT_USER -c 'mkdir -p ~/.ssh && cat <<EOL > ~/.ssh/config
+Host gitlab.cargonomica.com
+    HostName gitlab.cargonomica.com
+    User git
+    Port 4122
+    IdentityFile ~/.ssh/id_rsa
+    Compression yes
+    ServerAliveInterval 60
+Host dev-server
+    HostName 172.16.10.70
+    Port 4122
+    User suprunov
+    IdentityFile ~/.ssh/id_rsa
+    Compression yes
+    ServerAliveInterval 60    
+Host test-server
+    HostName 172.16.10.60
+    Port 4122
+    User root
+    IdentityFile ~/.ssh/id_rsa
+    Compression yes
+    ServerAliveInterval 60
+Host github
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_rsa
+    Compression yes
+    ServerAliveInterval 60
+EOL'
+}
+
+# Функция для отправки SSH-ключа на удаленные серверы от имени обычного пользователя
+send_ssh_key() {
+  echo "Отправка SSH-ключа на серверы..."
+
+  su - $NON_ROOT_USER -c 'ssh-copy-id -i ~/.ssh/id_rsa.pub -o "Port=4122" suprunov@172.16.10.70'
+  su - $NON_ROOT_USER -c 'ssh-copy-id -i ~/.ssh/id_rsa.pub -o "Port=4122" root@172.16.10.60'
+}
+
+# Функция для установки clip и копирования публичного ключа в буфер обмена от имени обычного пользователя
+install_and_copy_key() {
+  echo "Установка clip и копирование публичного ключа в буфер обмена..."
+
+  if [[ ! -f /usr/local/bin/clip ]]; then
+    sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip
+  else
+    echo "Символическая ссылка /usr/local/bin/clip уже существует."
+  fi
+
+  su - $NON_ROOT_USER -c 'cat ~/.ssh/id_rsa.pub | clip'
+
+  echo "Ваш публичный ключ скопирован в буфер обмена."
+  echo "Пожалуйста, добавьте его на gitlab.cargonomica.com и github.com."
+  read -p "Нажмите [Enter], когда добавите ключ на gitlab.cargonomica.com..."
+  read -p "Нажмите [Enter], когда добавите ключ на github.com..."
+}
+
+# Функция для настройки сервисов после установки
+configure_services() {
+  echo "Настройка сервисов..."
+
+  # Настройка PHP-FPM
+  systemctl enable php8.2-fpm
+  systemctl start php8.2-fpm
+
+  # Настройка Nginx
+  systemctl enable nginx
+  systemctl start nginx
+
+  # Настройка MySQL
+  systemctl enable mysql
+  systemctl start mysql
+
+  # Настройка PostgreSQL
+  systemctl enable postgresql
+  systemctl start postgresql
+
+  # Настройка Redis
+  systemctl enable redis-server
+  systemctl start redis-server
+
+  # Настройка Supervisor
+  systemctl enable supervisor
+  systemctl start supervisor
+}
+
+get_sources() {
+  scp dev-server:/home/suprunov/backup.crm.tar.gz /home/ssuprunov/backup.crm.tar.gz
+}
+
+# Основная функция для выполнения всех действий
+main() {
+
+  # check_root
+  # backup_sudoers
+  # comment_sudo_line
+  # add_sudo_nopasswd
+  # validate_sudoers
+  # install_dependencies
+  # install_packages
+  # install_php
+  # create_mysql_user
+  # create_postgresql_user
+  # configure_services
+  # generate_ssh_key
+  # setup_ssh_config
+  # send_ssh_key
+  # install_and_copy_key
+  get_sources
+}
+
+# Вызов основной функции
+main

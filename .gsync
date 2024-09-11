@@ -1,0 +1,8 @@
+[OPTIONS]
+source=/var/www/crm/
+target=dev-server:/home/bitrix/ext_www/p3.crm.b24dev.corp.ppricep.ru/
+links=true
+perms=false
+times=true
+group=false
+owner=false
