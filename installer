@@ -58,11 +58,43 @@ TEST_SERVER_LOGIN="root"
 
 # Отключение запроса пароля для команд с sudo
 disable_sudo_ask_password() {
-    [[ -f /etc/sudoers.bak ]] && { log "Резервная копия /etc/sudoers.bak существует. Восстанавливаю /etc/sudoers..."; sudo cp /etc/sudoers.bak /etc/sudoers; exit 1; }
-    sudo cp /etc/sudoers /etc/sudoers.bak
-    sudo sed -i '/^%sudo/s/^/# /' /etc/sudoers
-    [[ ! $(sudo grep -q '^%sudo ALL=(ALL) NOPASSWD: ALL' /etc/sudoers) ]] && echo "%sudo ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers > /dev/null
+    
+    # [[ -f /etc/sudoers.bak ]] && { log "Резервная копия /etc/sudoers.bak существует. Восстанавливаю /etc/sudoers..."; sudo cp /etc/sudoers.bak /etc/sudoers; exit 1; }
+    # sudo cp /etc/sudoers /etc/sudoers.bak
+    # sudo sed -i '/^%sudo/s/^/# /' /etc/sudoers
+    # [[ ! $(sudo grep -q '^%sudo ALL=(ALL) NOPASSWD: ALL' /etc/sudoers) ]] && echo "%sudo ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers > /dev/null
+
+    add_sudoer_entry $USER
+
 }
+
+#!/bin/bash
+
+# Функция для добавления строки в /etc/sudoers
+add_sudoer_entry() {
+    local user="$1"
+    local entry="${user} ALL=(ALL) NOPASSWD: ALL"
+
+    # Проверка, что строка уже существует в /etc/sudoers
+    if sudo grep -q "^${entry}$" /etc/sudoers; then
+        echo "Запись '${entry}' уже существует в /etc/sudoers."
+        return
+    fi
+
+    # Проверка, что резервная копия /etc/sudoers.bak существует
+    if [[ ! -f /etc/sudoers.bak ]]; then
+        echo "Создание резервной копии /etc/sudoers..."
+        sudo cp /etc/sudoers /etc/sudoers.bak
+    fi
+
+    # Добавление записи в /etc/sudoers
+    echo "Добавление записи '${entry}' в /etc/sudoers..."
+    echo "$entry" | sudo tee -a /etc/sudoers > /dev/null
+}
+
+# Вызов функции с нужным пользователем
+add_sudoer_entry "ssuprunov"
+
 
 # Функция для обновления системы и установки базовых пакетов
 install_dependencies() {
