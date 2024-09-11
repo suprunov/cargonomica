@@ -218,7 +218,7 @@ update_deps() {
 }
 
 git_settings() {
-    curl -o ~/.git-prompt.sh https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh
+    
     
     for repo in "${repos_list[@]}"; do
         log "Настройка репозитория ${repos["$repo.name"]}"
@@ -284,7 +284,18 @@ EOF
     echo 'export LANG=ru_RU.UTF-8' >> ~/.bashrc
     git config --global i18n.commitEncoding "UTF-8"
     git config --global i18n.logOutputEncoding "UTF-8"
-
+    curl -o ~/.git-prompt.sh https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh
+    echo "# Git Prompt Script" >> ~/.bashrc
+    echo "source ~/.git-prompt.sh" >> ~/.bashrc
+    echo "export GIT_PS1_SHOWDIRTYSTATE=true  # Показывать символы для незакоммиченных изменений" >> ~/.bashrc
+    echo "export GIT_PS1_SHOWSTASHSTATE=true   # Показывать состояние стэша" >> ~/.bashrc
+    echo "export GIT_PS1_SHOWUNTRACKEDFILES=true  # Показывать неотслеживаемые файлы" >> ~/.bashrc
+    echo "export GIT_PS1_SHOWUPSTREAM="auto"   # Показывать состояние upstream" >> ~/.bashrc
+    echo "# Настройка цветной командной строки" >> ~/.bashrc
+    echo "export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$(__git_ps1 " (\[\033[31m\]%s\[\033[00m\])")\$ '" >> ~/.bashrc
+    echo "# Настройка цветной командной строки Zsh" >> ~/.bashrc
+    echo "#export PROMPT='%{$fg[green]%}%n@%m%{$reset_color%}:%{$fg[blue]%}%~%{$reset_color%}$(__git_ps1 " (%{$fg[red]%}%s%{$reset_color%})")$ '" >> ~/.bashrc
+    source ~/.bashrc
 }
 
 # Выполнение всех действий
