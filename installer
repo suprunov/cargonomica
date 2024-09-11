@@ -2,189 +2,105 @@
 
 # Переменные для пользователей баз данных и текущего пользователя
 
-local_user="ssuprunov"
-work_email="s.suprunov@cargonomica.com"
-personal_email="sergeysuprunov@gmail.com"
-full_name="Sergey Suprunov"
-os=$(detect_os)
+EMAIL="s.suprunov@cargonomica.com"
+NAME="Sergey Suprunov"
 
-local_mysql_user="ssuprunov"
-local_mysql_password="qazqaz012"
+LOCAL_MYSQL_USER="ssuprunov"
+LOCAL_MYSQL_PASSWORD="qazqaz012"
 
-local_pgsql_user="ssuprunov"
-local_pgsql_password="qazqaz012"
+LOCAL_PGSQL_USER="ssuprunov"
+LOCAL_PGSQL_PASSWORD="qazqaz012"
 
-local_projects_path="/home/ssuprunov/www"
-backup_filename="backup.tar.gz"
+DEV_SERVER_LOGIN="suprunov"
 
-dev_server_host="172.16.10.70"
-dev_server_port=4122
-dev_server_user="suprunov"
-dev_server_backup_path="/home/bitrix/backup"
+TEST_SERVER_LOGIN="root"
 
-test_server_host="172.16.10.60"
-test_server_port=4122
-test_server_user="root"
-test_server_backup_path="/home/bitrix/backup"
-
-gitlab_host="gitlab.cargonomica.com"
-gitlab_port=4122
-
-# Функция для открытия URL в браузере
-open_url() {
-  local url="$1"  # Получаем первый параметр как URL
-
-  if [[ -z "$url" ]]; then
-    echo "Пожалуйста, укажите URL."
-    return 1
-  fi
-
-  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    xdg-open "$url"
-  elif [[ "$OSTYPE" == "darwin"* ]]; then
-    open "$url"
-  elif [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "msys" ]]; then
-    cmd.exe /c start "$url"
-  else
-    echo "Неизвестная ОС: $OSTYPE"
-    return 1
-  fi
-}
-
-detect_os() {
-  if grep -qi microsoft /proc/version; then
-    echo "wsl"  # Windows Subsystem for Linux + Ubuntu
-  else
-    case "$(uname -s)" in
-      Linux*) echo "linux" ;;  # Native Ubuntu or another Linux distribution
-      Darwin*) echo "macos" ;;  # macOS
-      *) echo "unknown" ;;  # Unknown OS
-    esac
-  fi
-}
-
-# Функция для проверки прав суперпользователя
-check_root() {
-  if [[ $EUID -ne 0 ]]; then
-    echo "Скрипт требует права администратора. Перезапуск с sudo..."
-    sudo "$0" "$@"  # Исправлено использование sudo
-    exit 1
-  fi
-}
 
 # Отключение запроса пароля для команд с sudo
 disable_sudo_ask_password() {
-    cp /etc/sudoers /etc/sudoers.bak
-    sed -i '/^%sudo/s/^/# /' /etc/sudoers
-    if ! grep -q '^%sudo ALL=(ALL) NOPASSWD: ALL' /etc/sudoers; then
-        echo "%sudo ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+    local sudoers_file="/etc/sudoers"
+    local sudoers_bak="/etc/sudoers.bak"
+
+    sudo cp "$sudoers_file" "$sudoers_bak"
+    sudo sed -i '/^%sudo/s/^/# /' "$sudoers_file"
+    if ! sudo grep -q '^%sudo ALL=(ALL) NOPASSWD: ALL' "$sudoers_file"; then
+        echo "%sudo ALL=(ALL) NOPASSWD: ALL" | sudo tee -a "$sudoers_file" > /dev/null
     fi
-    if visudo -c; then
-        echo "Файл /etc/sudoers успешно обновлен."
+    if sudo visudo -c; then
+        echo "Файл $sudoers_file успешно обновлен."
     else
-        echo "Ошибка в файле /etc/sudoers. Восстанавливаю резервную копию."
-        cp /etc/sudoers.bak /etc/sudoers
+        echo "Ошибка в файле $sudoers_file. Восстанавливаю резервную копию."
+        sudo cp "$sudoers_bak" "$sudoers_file"
         exit 1
     fi
 }
 
 # Функция для обновления системы и установки базовых пакетов
 install_dependencies() {
-    echo "Обновление списка пакетов и установка базовых зависимостей..."
-    apt-get update && apt-get upgrade -y
-    apt-get install -y software-properties-common curl wget lsb-release apt-transport-https
+     echo "Обновление списка пакетов и установка базовых зависимостей..."
+    sudo apt-get update && sudo apt-get upgrade -y
+    sudo apt-get install -y software-properties-common curl wget lsb-release apt-transport-https
     echo "Установка необходимых пакетов..."
-    apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor msmtp rsync inotify-tools gawk jq
-    add-apt-repository -y ppa:ondrej/php
-    apt-get update
+    sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor msmtp rsync inotify-tools gawk jq wslu
+    sudo add-apt-repository -y ppa:ondrej/php
+    sudo apt-get update
     # Устанавливаем PHP 8.2 и PHP-FPM
-    apt-get install -y php8.2 php8.2-fpm
+    sudo apt-get install -y php8.2 php8.2-fpm
     # Устанавливаем необходимые PHP-расширения
-    apt-get install -y php8.2-cli php8.2-mysql php8.2-pgsql php8.2-redis php8.2-xml php8.2-mbstring php8.2-zip php8.2-curl php8.2-gd php8.2-soap php8.2-intl php8.2-bcmath php8.2-opcache php8.2-imap php8.2-xdebug php8.2-ldap php8.2-xmlrpc php8.2-readline php8.2-msgpack php8.2-igbinary
+    sudo apt-get install -y php8.2-cli php8.2-mysql php8.2-pgsql php8.2-redis php8.2-xml php8.2-mbstring php8.2-zip php8.2-curl php8.2-gd php8.2-soap php8.2-intl php8.2-bcmath php8.2-opcache php8.2-imap php8.2-xdebug php8.2-ldap php8.2-xmlrpc php8.2-readline php8.2-msgpack php8.2-igbinary
 }
 
 # Функция для создания пользователей MySQL и PostgreSQL с полными привилегиями
 create_db_users() {
     echo "Создание пользователя MySQL..."
-  
-    mysql -e "CREATE USER '${local_mysql_user}'@'localhost' IDENTIFIED BY '${local_mysql_password}';"
-    mysql -e "GRANT ALL PRIVILEGES ON *.* TO '${local_mysql_user}'@'localhost' WITH GRANT OPTION;"
-    mysql -e "FLUSH PRIVILEGES;"
+    sudo mysql -e "CREATE USER '${LOCAL_MYSQL_USER}'@'localhost' IDENTIFIED BY '${LOCAL_MYSQL_PASSWORD}';"
+    sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO '${LOCAL_MYSQL_USER}'@'localhost' WITH GRANT OPTION;"
+    sudo mysql -e "FLUSH PRIVILEGES;"
     
     echo "Создание пользователя PostgreSQL..."
-  
-    sudo -u postgres psql -c "CREATE USER ${local_pgsql_user} WITH PASSWORD '${local_pgsql_password}';"
-    sudo -u postgres psql -c "ALTER USER ${local_pgsql_user} WITH SUPERUSER;"
+    sudo -u postgres psql -c "CREATE USER ${LOCAL_PGSQL_USER} WITH PASSWORD '${LOCAL_PGSQL_PASSWORD}';"
+    sudo -u postgres psql -c "ALTER USER ${LOCAL_PGSQL_USER} WITH SUPERUSER;"
 }
 
 # Функция для настройки сервисов после установки
 configure_services() {
   echo "Настройка сервисов..."
-
-  # Настройка PHP-FPM
-  systemctl enable php8.2-fpm
-  systemctl start php8.2-fpm
-
-  # Настройка Nginx
-  systemctl enable nginx
-  systemctl start nginx
-
-  # Настройка MySQL
-  systemctl enable mysql
-  systemctl start mysql
-
-  # Настройка PostgreSQL
-  systemctl enable postgresql
-  systemctl start postgresql
-
-  # Настройка Redis
-  systemctl enable redis-server
-  systemctl start redis-server
-
-  # Настройка Supervisor
-  systemctl enable supervisor
-  systemctl start supervisor
+    for service in php8.2-fpm nginx mysql postgresql redis-server supervisor; do
+        sudo systemctl enable "$service"
+        sudo systemctl start "$service"
+    done
 }
 
 # Функция для создания файла ~/.ssh/config от имени обычного пользователя
 setup_ssh() {
     echo "Генерация SSH-ключа..."
-
-    # Генерация SSH-ключа под пользователем $local_user
-    su - $local_user
-    if [[ ! -f ~/.ssh/id_rsa ]]; then
-        ssh-keygen -t rsa -b 4096 -C "${work_email}" -f ~/.ssh/id_rsa -N "";
-    else
-        echo "SSH-ключ уже существует.";
-    fi
+    [[ ! -f ~/.ssh/id_rsa ]] && ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f ~/.ssh/id_rsa -N "" || echo "SSH-ключ уже существует."
     
     echo "Создание файла ~/.ssh/config..."
-
-    # Создание файла ~/.ssh/config под пользователем $local_user
     mkdir -p ~/.ssh
-    cat <<EOL > ~/.ssh/config
+    cat <<EOF > ~/.ssh/config
 Host gitlab
-    HostName '${gitlab_host}'
+    HostName gitlab.cargonomica.com
     User git
-    Port '${gitlab_port}'
+    Port 4122
     IdentityFile ~/.ssh/id_rsa
     Compression yes
     ServerAliveInterval 60
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
 Host dev-server
-    HostName '${dev_server_host}'
-    Port '${dev_server_port}'
-    User '${dev_server_user}'
+    HostName 172.16.10.70
+    Port 4122
+    User ${DEV_SERVER_LOGIN}
     IdentityFile ~/.ssh/id_rsa
     Compression yes
     ServerAliveInterval 60
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
 Host test-server
-    HostName '${test_server_host}'
-    Port '${test_server_port}'
-    User '${test_server_user}'
+    HostName 172.16.10.60
+    Port 4122
+    User ${TEST_SERVER_LOGIN}
     IdentityFile ~/.ssh/id_rsa
     Compression yes
     ServerAliveInterval 60
@@ -198,73 +114,62 @@ Host github
     ServerAliveInterval 60
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
-EOL
-    
-    echo "Отправка SSH-ключа на серверы..."
+EOF
 
-    # Отправка SSH-ключа на серверы
- 
-    ssh-copy-id -i ~/.ssh/id_rsa.pub -p '${dev_server_port}' -o StrictHostKeyChecking=no '${dev_server_user}'@'${dev_server_host}'
-    ssh-copy-id -i ~/.ssh/id_rsa.pub -p '${test_server_port}' -o StrictHostKeyChecking=no '${test_server_user}'@'${test_server_host}'
+    chmod 700 ~/.ssh
+    chmod 600 ~/.ssh/id_rsa ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys ~/.ssh/config
+    chmod 644 ~/.ssh/id_rsa.pub ~/.ssh/known_hosts
+
+    echo "Отправка SSH-ключа на серверы..."
+    ssh-copy-id dev-server
+    ssh-copy-id test-server
     
     echo "Установка clip и копирование публичного ключа в буфер обмена..."
-
-    # Установка clip и копирование публичного ключа в буфер обмена под пользователем root
-    if [[ ! -f /usr/local/bin/clip ]]; then
-        sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip
-    else
-        echo "Символическая ссылка /usr/local/bin/clip уже существует."
-    fi
-
+    [[ ! -f /usr/local/bin/clip ]] && sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip || echo "Символическая ссылка /usr/local/bin/clip уже существует."
     cat ~/.ssh/id_rsa.pub | clip
     
     echo "Ваш публичный ключ скопирован в буфер обмена."
     echo "Пожалуйста, добавьте его на gitlab.cargonomica.com и github.com."
-    open_url "https://gitlab.cargonomica.com/-/profile/keys"
+    wslview "https://gitlab.cargonomica.com/-/profile/keys"
     read -p "Нажмите [Enter], когда добавите ключ на https://gitlab.cargonomica.com/-/profile/keys..."
-    open_url "https://github.com/settings/keys"
+    wslview "https://github.com/settings/keys"
     read -p "Нажмите [Enter], когда добавите ключ на https://github.com/settings/keys..."
-    exit
 }
 
 
 create_projects_structure() {
-    chown -R "${local_user}":"${local_user}" "${local_projects_path}"
-    find "${local_projects_path}" -type d -exec chmod 2775 {} \;
-    find "${local_projects_path}" -type f -exec chmod 664 {} \;
-    mkdir -p "${local_projects_path}"
-    scp "dev-server:${dev_server_backup_path}/${backup_filename}" "${local_projects_path}/${backup_filename}"    
-    cd "${local_projects_path}"
-    tar -xzf "${backup_filename}"
-    rm -f "./${backup_filename}"
-    cd "${local_projects_path}/crm"
-    ln -s ../_core/bitrix bitrix
-    ln -s ../_core/local local
-    ln -s ../_core/logs logs
-    ln -s ../_core/images images
-    ln -s ../_core/upload upload
-    ln -s ../_core/vendor vendor
-    cd "${local_projects_path}/wagnermaier"
-    ln -s ../_core/bitrix bitrix
-    ln -s ../_core/local local
-    ln -s ../_core/logs logs
-    ln -s ../_core/images images
-    ln -s ../_core/upload upload
-    ln -s ../_core/vendor vendor
-    chown -R "${local_user}":"${local_user}" "${local_projects_path}"
-    find "${local_projects_path}" -type d -exec chmod 2775 {} \;
-    find "${local_projects_path}" -type f -exec chmod 664 {} \;
+    echo "Создание структуры проектов..."
+    cd ~ || exit
+    sudo chown -R "$USER:$USER" .
+    [[ ! -d ~/www ]] && mkdir -p ~/www
+    cd ~/www || exit
+    scp dev-server:/home/bitrix/backup/backup.tar.gz ~/www/backup.tar.gz
+    tar -xzf backup.tar.gz
+    rm -f ~/www/backup.tar.gz
+
+    # Создание символьных ссылок
+    for project in crm wagnermaier main; do
+        cd ~/www/"$project" || exit
+        ln -s ../_core/bitrix bitrix
+        ln -s ../_core/local local
+        ln -s ../_core/logs logs
+        ln -s ../_core/images images
+        ln -s ../_core/upload upload
+        ln -s ../_core/vendor vendor
+    done
+
+    find ~/www -type d -exec chmod 2775 {} \;
+    find ~/www -type f -exec chmod 664 {} \;
 }
 
 
 # Основная функция для выполнения всех действий
 main() {
-    check_root "$@"
+    setup_ssh
     disable_sudo_ask_password
     install_dependencies
     create_db_users
     configure_services
-    setup_ssh
     create_projects_structure
 }
 
