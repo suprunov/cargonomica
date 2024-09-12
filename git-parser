@@ -1,0 +1,14 @@
+function parseGitBranch {
+    git branch --no-color 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\[\1\]/'
+}
+
+RED="\[\033[01;31m\]"
+GREEN="\[\033[01;32m\]"
+YELLOW="\[\033[01;33m\]"
+BLUE="\[\033[01;34m\]"
+CYAN="\[\033[01;36m\]"
+PURPLE="\[\033[01;35m\]"
+WHITE="\[\033[01;37m\]"
+NO_COLOR="\[\033[0m\]"
+
+PS1="$YELLOW\$(date +%H:%M:%S) $GREEN\u@\h:$BLUE\w $RED\$(parseGitBranch) $NO_COLOR\$ "
