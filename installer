@@ -216,9 +216,9 @@ create_projects_structure() {
         cd "${HOME}/www/$project" || exit
         ln -s ../_core/bitrix bitrix
         ln -s ../_core/local local
-        ln -s ../_core/logs logs
-        ln -s ../_core/images images
-        ln -s ../_core/upload upload
+#        ln -s ../_core/logs logs
+#        ln -s ../_core/images images
+#        ln -s ../_core/upload upload
         ln -s ../_core/vendor vendor
     done
     find "${HOME}/www" -type d -exec chmod 2775 {} \;
