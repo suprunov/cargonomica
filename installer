@@ -95,7 +95,7 @@ run() {
 # Функция для логирования
 log() {
     local message="$1"
-    echo "$(date +'%Y-%m-%d %H:%M:%S') - ${message}" | tee -a /home/$USER/installer.log
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - ${message}" | tee -a "/home/$USER/installer.log"
 }
 
 # Функция для добавления строки в /etc/sudoers
@@ -149,7 +149,11 @@ configure_services() {
 # Функция для создания файла /home/$USER/.ssh/config от имени обычного пользователя
 setup_ssh() {
     log "Настройка SSH..."
-    [[ ! -f /home/$USER/.ssh/id_rsa ]] && ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f "/home/$USER/.ssh/id_rsa" -N "" || log "SSH-ключ уже существует."
+    if [[ ! -f /home/$USER/.ssh/id_rsa ]]; then
+        ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f "/home/$USER/.ssh/id_rsa" -N ""
+    else
+        log "SSH-ключ уже существует."
+    fi
     mkdir -p "/home/$USER/.ssh"
     cat << EOF > "/home/$USER/.ssh/config"
 Host gitlab
@@ -188,7 +192,11 @@ EOF
     [ -f "/home/$USER/.ssh/config" ] && chmod 600 "/home/$USER/.ssh/config"
     sshpass -p $DEV_SERVER_PASSWORD ssh-copy-id dev-server
     sshpass -p $TEST_SERVER_PASSWORD ssh-copy-id test-server
-    [[ ! -f /usr/local/bin/clip ]] && sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip || log "Символическая ссылка /usr/local/bin/clip уже существует."
+    if [[ ! -f /usr/local/bin/clip ]]; then
+        sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip
+    else
+        log "Символическая ссылка /usr/local/bin/clip уже существует."
+    fi
     clip < "/home/$USER/.ssh/id_rsa.pub"
     wslview "https://gitlab.cargonomica.com/-/profile/keys"
     read -p -r "Нажмите [Enter], когда добавите ключ на https://gitlab.cargonomica.com/-/profile/keys..."
@@ -346,15 +354,31 @@ install_rsync() {
 setup_projects() {
     log "Клонирование репозиториев и настройка окружения..."
     for project in "${repos_list[@]}"; do
-        [[ ! -d "${repos["$project.local"]}" ]] && git clone "${repos["$project.git"]}" "${repos["$project.local"]}" || log "Репозиторий '${repos["$project.name"]}' уже склонирован."
+        if [[ ! -d "${repos["$project.local"]}" ]]; then
+            git clone "${repos["$project.git"]}" "${repos["$project.local"]}"
+        else
+           log "Репозиторий '${repos["$project.name"]}' уже склонирован."
+        fi
         pushd "${repos["$project.local"]}" > /dev/null || exit
         git reset --hard
         git pull
         git config user.name "$NAME"
         git config user.email "$EMAIL"
-        [[ "${repos["$project.husky"]}" == "true" && ! -f "/home/$USER/.husky/_/husky.sh" ]] && npx husky install || log "Husky уже настроен."
-        [[ -f /home/$USER/www/${repos["$project.local"]}/composer.json ]] && composer install --ignore-platform-reqs || log "Файл composer.json отсутствует."
-        [[ -f /home/$USER/www/${repos["$project.local"]}/package.json ]] && yarn install --network-timeout=100000 || log "Файл package.json отсутствует."
+        if [[ "${repos["$project.husky"]}" == "true" && ! -f "/home/$USER/.husky/_/husky.sh" ]]; then
+            npx husky install
+        else
+            log "Husky уже настроен."
+        fi
+        if [[ -f /home/$USER/www/${repos["$project.local"]}/composer.json ]]; then
+            composer install --ignore-platform-reqs
+        else
+            log "Файл composer.json отсутствует."
+        fi
+        if [[ -f /home/$USER/www/${repos["$project.local"]}/package.json ]]; then
+            yarn install --network-timeout=100000
+        else
+            log "Файл package.json отсутствует."
+        fi
         [[ "${repos["$project.update"]}" == "true" ]] && yarn upgrade --latest
         popd > /dev/null || exit
     done
