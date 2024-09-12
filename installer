@@ -265,13 +265,13 @@ EOF
             git fetch --all
             git checkout -B develop origin/develop
         fi
-        сat << EOF > "${repos["${repo}.local"]}/.nogsync"
-logs/
-*.log
-*.tmp
-bitrix/
-upload/
-EOF
+#        сat << EOF > "${repos["${repo}.local"]}/.nogsync"
+#logs/
+#*.log
+#*.tmp
+#bitrix/
+#upload/
+#EOF
         if [ "${repos["$repo.sync"]}" = "true" ]; then
             cat << EOF > "${HOME}/gsync/.${repo}.gsync"
 [OPTIONS]
