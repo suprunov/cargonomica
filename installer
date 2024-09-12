@@ -315,10 +315,10 @@ XKBVARIANT=""
 XKBOPTIONS="grp:alt_shift_toggle"
 EOF
     sudo dpkg-reconfigure console-setup
-    echo 'export LANG=ru_RU.UTF-8' >> ~/.bashrc
+    echo 'export LANG=ru_RU.UTF-8' >> "${HOME}/.bashrc"
     git config --global i18n.commitEncoding "UTF-8"
     git config --global i18n.logOutputEncoding "UTF-8"
-    curl -o ~/.git-prompt.sh https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh
+    curl -o "${HOME}/.git-prompt.sh https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh"
     cat << EOF >> ~/.bashrc
 # Git Prompt Script
 source "$HOME/.git-prompt.sh"
@@ -329,7 +329,7 @@ export GIT_PS1_SHOWUPSTREAM="auto"   # Показывать состояние u
 # Настройка цветной командной строки
 export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$(__git_ps1 " (\[\033[31m\]%s\[\033[00m\])")\$ '
 EOF
-    source ~/.bashrc
+    source "${HOME}/.bashrc"
 }
 
 install_node() {
