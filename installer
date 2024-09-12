@@ -22,7 +22,7 @@ repos["crm.remote"]="/home/bitrix/ext_www/p3.crm.b24dev.corp.ppricep.ru"
 repos["crm.url"]="https://p3.crm.b24dev.corp.ppricep.ru"
 repos["crm.common"]="false"
 repos["crm.sync"]="true"
-repos["crm.hasky"]="true"
+repos["crm.husky"]="true"
 repos["crm.update"]="true"
 
 repos["wagnermaier.name"]="wagnermaier (wagnermaier.com)"
@@ -32,7 +32,7 @@ repos["wagnermaier.remote"]="/home/bitrix/ext_www/p3.wagnermaier.b24dev.corp.ppr
 repos["wagnermaier.url"]="https://p3.wagnermaier.b24dev.corp.ppricep.ru"
 repos["wagnermaier.common"]="false"
 repos["wagnermaier.sync"]="true"
-repos["wagnermaier.hasky"]="true"
+repos["wagnermaier.husky"]="true"
 repos["wagnermaier.update"]="true"
 
 # repos["main.name"]="main (cargonomica.com)"
@@ -42,7 +42,7 @@ repos["wagnermaier.update"]="true"
 # repos["main.url"]="https://p3.b24dev.corp.ppricep.ru"
 # repos["main.common"]="false"
 # repos["main.sync"]="true"
-# repos["main.hasky"]="true"
+# repos["main.husky"]="true"
 # repos["main.update"]="true"
 
 repos["local.name"]="local (project/local)"
@@ -52,7 +52,7 @@ repos["local.remote"]="/home/bitrix/p3.core/local"
 repos["local.url"]=""
 repos["local.common"]="true"
 repos["local.sync"]="true"
-repos["local.hasky"]="true"
+repos["local.husky"]="true"
 repos["local.update"]="true"
 
 repos["bitrix.name"]="bitrix (project/bitrix)"
@@ -62,7 +62,7 @@ repos["bitrix.remote"]="/home/bitrix/p3.core/bitrix"
 repos["bitrix.url"]=""
 repos["bitrix.common"]="true"
 repos["bitrix.sync"]="false"
-repos["bitrix.hasky"]="false"
+repos["bitrix.husky"]="false"
 repos["bitrix.update"]="false"
 
 repos["vendor.name"]="vendor (project/vendor)"
@@ -72,7 +72,7 @@ repos["vendor.remote"]="/home/bitrix/p3.core/vendor"
 repos["vendor.url"]=""
 repos["vendor.common"]="true"
 repos["vendor.sync"]="true"
-repos["vendor.hasky"]="false"
+repos["vendor.husky"]="false"
 repos["vendor.update"]="true"
 
 repos_list=(
@@ -84,6 +84,14 @@ repos_list=(
     "vendor"
 )
 
+
+run() {
+    local fn="$1"
+    log "start $1"
+    $fn
+    log "finish $1"
+}
+
 # Функция для логирования
 log() {
     local message="$1"
@@ -91,7 +99,7 @@ log() {
 }
 
 # Функция для добавления строки в /etc/sudoers
-add_sudoer_entry() {
+add_sudoers_entry() {
     local user="$1"
     local entry="${user} ALL=(ALL) NOPASSWD: ALL"
     if sudo grep -q "^${entry}$" /etc/sudoers; then
@@ -113,14 +121,13 @@ install_dependencies() {
     sudo apt-get update && sudo apt-get upgrade -y
     sudo apt-get install -y software-properties-common curl wget lsb-release apt-transport-https
     sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor rsync inotify-tools gawk jq wslu sshpass msmtp
-    # DEBIAN_FRONTEND=noninteractive sudo apt-get install -y msmtp
     sudo add-apt-repository -y ppa:ondrej/php
     sudo apt-get update
     sudo apt-get install -y php8.2 php8.2-fpm
     sudo apt-get install -y php8.2-cli php8.2-mysql php8.2-pgsql php8.2-redis php8.2-xml php8.2-mbstring php8.2-zip php8.2-curl php8.2-gd php8.2-soap php8.2-intl php8.2-bcmath php8.2-opcache php8.2-imap php8.2-xdebug php8.2-ldap php8.2-xmlrpc php8.2-readline php8.2-msgpack php8.2-igbinary
 }
 
-# Функция для создания пользователей MySQL и PostgreSQL с полными привилегиями
+# Функция для создания пользователей MySQL и PostgresSQL с полными привилегиями
 create_db_users() {
     log "Создание пользователей баз данных..."
     sudo mysql -e "CREATE USER '${LOCAL_MYSQL_USER}'@'localhost' IDENTIFIED BY '${LOCAL_MYSQL_PASSWORD}';"
@@ -137,26 +144,14 @@ configure_services() {
         sudo systemctl enable "$service"
         sudo systemctl start "$service"
     done
-
-#     sudo cat << EOF >> /etc/msmtprc
-# account default
-# host smtp.your-email-provider.com
-# port 587
-# auth on
-# user your-email@your-domain.com
-# password your-password
-# tls on
-# tls_trust_file /etc/ssl/certs/ca-certificates.crt
-# EOF
-
 }
 
 # Функция для создания файла /home/$USER/.ssh/config от имени обычного пользователя
 setup_ssh() {
     log "Настройка SSH..."
-    [[ ! -f /home/$USER/.ssh/id_rsa ]] && ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f /home/$USER/.ssh/id_rsa -N "" || log "SSH-ключ уже существует."
-    mkdir -p /home/$USER/.ssh
-    cat << EOF >> "/home/$USER/.ssh/config"
+    [[ ! -f /home/$USER/.ssh/id_rsa ]] && ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f "/home/$USER/.ssh/id_rsa" -N "" || log "SSH-ключ уже существует."
+    mkdir -p "/home/$USER/.ssh"
+    cat << EOF > "/home/$USER/.ssh/config"
 Host gitlab
     HostName gitlab.cargonomica.com
     User git
@@ -185,31 +180,31 @@ Host test-server
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
 EOF
-    [ -d /home/$USER/.ssh ] && chmod 700 /home/$USER/.ssh
-    [ -f /home/$USER/.ssh/id_rsa ] && chmod 600 /home/$USER/.ssh/id_rsa
-    [ -f /home/$USER/.ssh/id_rsa.pub ] && chmod 644 /home/$USER/.ssh/id_rsa.pub
-    [ -f /home/$USER/.ssh/authorized_keys ] && chmod 600 /home/$USER/.ssh/authorized_keys
-    [ -f /home/$USER/.ssh/known_hosts ] && chmod 644 /home/$USER/.ssh/known_hosts
-    [ -f /home/$USER/.ssh/config ] && chmod 600 /home/$USER/.ssh/config
+    [ -d "/home/$USER/.ssh" ] && chmod 700 "/home/$USER/.ssh"
+    [ -f "/home/$USER/.ssh/id_rsa" ] && chmod 600 "/home/$USER/.ssh/id_rsa"
+    [ -f "/home/$USER/.ssh/id_rsa.pub" ] && chmod 644 "/home/$USER/.ssh/id_rsa.pub"
+    [ -f "/home/$USER/.ssh/authorized_keys" ] && chmod 600 "/home/$USER/.ssh/authorized_keys"
+    [ -f "/home/$USER/.ssh/known_hosts" ] && chmod 644 "/home/$USER/.ssh/known_hosts"
+    [ -f "/home/$USER/.ssh/config" ] && chmod 600 "/home/$USER/.ssh/config"
     sshpass -p $DEV_SERVER_PASSWORD ssh-copy-id dev-server
     sshpass -p $TEST_SERVER_PASSWORD ssh-copy-id test-server
     [[ ! -f /usr/local/bin/clip ]] && sudo ln -s /mnt/c/Windows/System32/clip.exe /usr/local/bin/clip || log "Символическая ссылка /usr/local/bin/clip уже существует."
-    cat /home/$USER/.ssh/id_rsa.pub | clip
+    clip < "/home/$USER/.ssh/id_rsa.pub"
     wslview "https://gitlab.cargonomica.com/-/profile/keys"
-    read -p "Нажмите [Enter], когда добавите ключ на https://gitlab.cargonomica.com/-/profile/keys..."
+    read -p -r "Нажмите [Enter], когда добавите ключ на https://gitlab.cargonomica.com/-/profile/keys..."
 }
 
 create_projects_structure() {
     log "Создание структуры проектов..."
-    cd /home/$USER || exit
+    cd "/home/$USER" || exit
     sudo chown -R "$USER:$USER" .
-    [[ ! -d /home/$USER/www ]] && mkdir -p /home/$USER/www
-    cd /home/$USER/www || exit
-    scp dev-server:/home/bitrix/backup/backup.tar.gz /home/$USER/www/backup.tar.gz
+    [[ ! -d /home/$USER/www ]] && mkdir -p "/home/$USER/www"
+    cd "/home/$USER/www" || exit
+    scp dev-server:/home/bitrix/backup/backup.tar.gz "/home/$USER/www/backup.tar.gz"
     tar -xvzf backup.tar.gz
-    rm -f /home/$USER/www/backup.tar.gz
+    rm -f "/home/$USER/www/backup.tar.gz"
     for project in crm wagnermaier; do
-        cd /home/$USER/www/"$project" || exit
+        cd "/home/$USER/www/$project" || exit
         ln -s ../_core/bitrix bitrix
         ln -s ../_core/local local
         ln -s ../_core/logs logs
@@ -217,8 +212,8 @@ create_projects_structure() {
         ln -s ../_core/upload upload
         ln -s ../_core/vendor vendor
     done
-    find /home/$USER/www -type d -exec chmod 2775 {} \;
-    find /home/$USER/www -type f -exec chmod 664 {} \;
+    find "/home/$USER/www" -type d -exec chmod 2775 {} \;
+    find "/home/$USER/www" -type f -exec chmod 664 {} \;
 }
 
 update_deps() {
@@ -226,28 +221,26 @@ update_deps() {
     sudo apt upgrade -y
     set_locale
     sudo apt install mc -y
-    add_sudoer_entry $USER
+    add_sudoers_entry "$USER"
 }
 
 git_settings() {
-    
-    
     for repo in "${repos_list[@]}"; do
         log "Настройка репозитория ${repos["$repo.name"]}"
         cd "${repos["$repo.local"]}" || exit
-        git remote set-url origin ${repos["$repo.git"]}
+        git remote set-url origin "${repos["$repo.git"]}"
         git remote -v
         git config user.name "${NAME}"
         git config user.email "${EMAIL}"
         git config color.ui auto
         git config advice.ignoredHook false
-        cat << EOF >> "${repos["$repo.local"]}/.git/hooks/post-checkout"
+        cat << EOF > "${repos["$repo.local"]}/.git/hooks/post-checkout"
 #!/bin/bash
 find . -type f -exec chmod 664 {} \;
 find . -type d -exec chmod 2775 {} \;
 EOF
         chmod +x "${repos["$repo.local"]}/.git/hooks/post-checkout"
-        cat << EOF >> "${repos["$repo.local"]}/.git/hooks/prepare-commit-msg"
+        cat << EOF > "${repos["$repo.local"]}/.git/hooks/prepare-commit-msg"
 #!/bin/bash
 BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
 COMMIT_MSG_FILE=$1
@@ -256,16 +249,22 @@ if ! grep -q "\[$BRANCH_NAME\]" "$COMMIT_MSG_FILE"; then
 fi
 EOF
         chmod +x "${repos["$repo.local"]}/.git/hooks/prepare-commit-msg"
-        cd "${repos["$repo.local"]}"
+        cd "${repos["$repo.local"]}" || exit
         if [ "${repos["$repo.update"]}" = "true" ]; then
             git checkout .
             git clean -df
             git fetch --all
             git checkout -B develop origin/develop
         fi
-
+        сat << EOF > "${repos["${repo}.local"]}/.nogsync"
+logs/
+*.log
+*.tmp
+bitrix/
+upload/
+EOF
         if [ "${repos["$repo.sync"]}" = "true" ]; then
-            sudo cat << EOF >> "/home/${USER}/gsync/.${repo}.gsync"
+            cat << EOF > "/home/${USER}/gsync/.${repo}.gsync"
 [OPTIONS]
 source="${repos["${repo}.local"]}"
 target="dev-server:${repos["${repo}.remote"]}" 
@@ -275,17 +274,19 @@ times=true
 group=false
 owner=false
 EOF
+            cat << EOF > "/home/${USER}/gsync/gsync-${repo}.conf"
+[program:gsync-${repo}]
+command=/home/${USER}/gsync/gsync --config=/home/${USER}/gsync/.${repo}.gsync
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/gsync-${repo}.err.log
+stdout_logfile=/var/log/gsync-${repo}.out.log
+EOF
+            sudo cp -f "/home/${USER}/gsync/gsync-${repo}.conf" "/etc/supervisor/conf.d/gsync-${repo}.conf"
+            sudo supervisorctl reread
+            sudo supervisorctl update
+            sudo supervisorctl start "gsync-${repo}"
         fi
-
-
-        # echo "Processing $repo:"
-        # echo "name: ${repos["$repo.name"]}"
-        # echo "remote: ${repos["$repo.git"]}"
-        # echo "local: ${repos["$repo.local"]}"
-        # echo "common: ${repos["$repo.common"]}"
-        # echo "sync: ${repos["$repo.sync"]}"
-        # echo "hasky: ${repos["$repo.hasky"]}"
-        # echo "update: ${repos["$repo.update"]}"
         git status
         echo "----------------------------"
         echo "----------------------------"
@@ -295,33 +296,32 @@ EOF
 set_locale() {
     sudo locale-gen ru_RU.UTF-8
     sudo update-locale LANG=ru_RU.UTF-8
-    sudo cat << EOF >> /etc/default/console-setup
+    sudo tee /etc/default/console-setup > /dev/null << EOF
 CHARMAP="UTF-8"
 CODESET="CyrSlav"
 FONTFACE="Terminus"
 FONTSIZE="16x32"
 EOF
-    sudo cat << EOF >> /etc/default/keyboard
+    sudo tee /etc/default/keyboard > /dev/null << EOF
 XKBLAYOUT="us,ru"
 XKBVARIANT=""
 XKBOPTIONS="grp:alt_shift_toggle"
 EOF
-    #DEBIAN_FRONTEND=noninteractive sudo dpkg-reconfigure console-setup
     sudo dpkg-reconfigure console-setup
     echo 'export LANG=ru_RU.UTF-8' >> ~/.bashrc
     git config --global i18n.commitEncoding "UTF-8"
     git config --global i18n.logOutputEncoding "UTF-8"
     curl -o ~/.git-prompt.sh https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh
-    echo "# Git Prompt Script" >> ~/.bashrc
-    echo "source ~/.git-prompt.sh" >> ~/.bashrc
-    echo "export GIT_PS1_SHOWDIRTYSTATE=true  # Показывать символы для незакоммиченных изменений" >> ~/.bashrc
-    echo "export GIT_PS1_SHOWSTASHSTATE=true   # Показывать состояние стэша" >> ~/.bashrc
-    echo "export GIT_PS1_SHOWUNTRACKEDFILES=true  # Показывать неотслеживаемые файлы" >> ~/.bashrc
-    echo "export GIT_PS1_SHOWUPSTREAM="auto"   # Показывать состояние upstream" >> ~/.bashrc
-    echo "# Настройка цветной командной строки" >> ~/.bashrc
-    echo "export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$(__git_ps1 " (\[\033[31m\]%s\[\033[00m\])")\$ '" >> ~/.bashrc
-    echo "# Настройка цветной командной строки Zsh" >> ~/.bashrc
-    echo "#export PROMPT='%{$fg[green]%}%n@%m%{$reset_color%}:%{$fg[blue]%}%~%{$reset_color%}$(__git_ps1 " (%{$fg[red]%}%s%{$reset_color%})")$ '" >> ~/.bashrc
+    cat << EOF >> ~/.bashrc
+# Git Prompt Script
+source "$HOME/.git-prompt.sh"
+export GIT_PS1_SHOWDIRTYSTATE=true  # Показывать символы для незакоммиченных изменений
+export GIT_PS1_SHOWSTASHSTATE=true   # Показывать состояние стэша
+export GIT_PS1_SHOWUNTRACKEDFILES=true  # Показывать неотслеживаемые файлы
+export GIT_PS1_SHOWUPSTREAM="auto"   # Показывать состояние upstream
+# Настройка цветной командной строки
+export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$(__git_ps1 " (\[\033[31m\]%s\[\033[00m\])")\$ '
+EOF
     source ~/.bashrc
 }
 
@@ -337,20 +337,39 @@ install_node() {
 }
 
 install_rsync() {
-    git clone https://github.com/e-bash/gsync.git
-    cd gsync
+    git clone https://github.com/e-bash/gsync.git "/home/${USER}/gsync"
+    cd gsync || exit
     chmod +x gsync
+}
+
+# Функция для клонирования репозиториев и настройки окружения
+setup_projects() {
+    log "Клонирование репозиториев и настройка окружения..."
+    for project in "${repos_list[@]}"; do
+        [[ ! -d "${repos["$project.local"]}" ]] && git clone "${repos["$project.git"]}" "${repos["$project.local"]}" || log "Репозиторий '${repos["$project.name"]}' уже склонирован."
+        pushd "${repos["$project.local"]}" > /dev/null || exit
+        git reset --hard
+        git pull
+        git config user.name "$NAME"
+        git config user.email "$EMAIL"
+        [[ "${repos["$project.husky"]}" == "true" && ! -f "/home/$USER/.husky/_/husky.sh" ]] && npx husky install || log "Husky уже настроен."
+        [[ -f /home/$USER/www/${repos["$project.local"]}/composer.json ]] && composer install --ignore-platform-reqs || log "Файл composer.json отсутствует."
+        [[ -f /home/$USER/www/${repos["$project.local"]}/package.json ]] && yarn install --network-timeout=100000 || log "Файл package.json отсутствует."
+        [[ "${repos["$project.update"]}" == "true" ]] && yarn upgrade --latest
+        popd > /dev/null || exit
+    done
+    yarn global add gulp-cli || log "gulp-cli уже установлен."
 }
 
 # Выполнение всех действий
 log "Начинаю выполнение скрипта..."
-update_deps
-install_dependencies
-install_node
-create_db_users
-configure_services
-setup_ssh
-create_projects_structure
-git_settings
-install_rsync
+run update_deps
+run install_dependencies
+run install_node
+run create_db_users
+run configure_services
+run setup_ssh
+run create_projects_structure
+run install_rsync
+run git_settings
 log "Скрипт выполнен успешно."
