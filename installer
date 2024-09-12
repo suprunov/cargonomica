@@ -1,6 +1,20 @@
 #!/bin/bash
 # sudo apt update && sudo apt upgrade -y && curl -fsSL https://raw.githubusercontent.com/suprunov/cargonomica/master/installer -o installer && chmod +x installer && ./installer
 
+
+# Получаем имя текущего скрипта и задаем имя файла лога
+LOG_FILE="${0%.*}.log"
+
+# Цветовые коды для вывода в терминал
+RESET_COLOR="\033[0m"
+LIGHT_GREEN="\033[1;32m"
+WHITE_ON_BLUE="\033[1;37;44m"
+BLACK_ON_LIGHT_GRAY="\033[0;30;47m"
+WHITE_ON_ORANGE="\033[1;37;43m"
+WHITE_ON_RED="\033[1;37;41m"
+WHITE="\033[1;37m"
+
+
 # Переменные для пользователей баз данных и текущего пользователя
 EMAIL="s.suprunov@cargonomica.com"
 NAME="Sergey Suprunov"
@@ -93,11 +107,38 @@ run() {
 
 # Функция для логирования
 log() {
-    local message="$1"
-    local yellow='\033[1;33m'  # Желтый цвет
-    local green='\033[1;32m'   # Ярко-зеленый цвет
-    local reset='\033[0m'      # Сброс цвета
-    echo -e "$(date +'%Y-%m-%d %H:%M:%S' | awk -v yellow="$yellow" -v reset="$reset" '{print yellow $0 reset}') - ${message}" | tee -a "${HOME}/installer.log" | awk -v green="$green" -v reset="$reset" '{print $0}' | sed "s/${message}/${green}${message}${reset}/"
+  local level="${1:-info}" # Уровень лога (по умолчанию info)
+  shift # Удаляем первый аргумент и оставляем только сообщение
+  local message="$*"       # Объединяем оставшиеся аргументы в сообщение
+  local timestamp
+  timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+
+  # Проверка на пустое сообщение
+  if [[ -z "$message" ]]; then
+    message="(no message provided)"
+  fi
+
+  # Определение цвета уровня для вывода на экран
+  local color_level=""
+  case "$level" in
+    info) color_level="$WHITE_ON_BLUE" ;;
+    debug) color_level="$BLACK_ON_LIGHT_GRAY" ;;
+    warn) color_level="$WHITE_ON_ORANGE" ;;
+    error) color_level="$WHITE_ON_RED" ;;
+    *) level="info" ; color_level="$WHITE_ON_BLUE" ;; # Если уровень не известен, используется "info"
+  esac
+
+  # Формирование строки для вывода на экран
+  local log_message="${LIGHT_GREEN}${timestamp}${RESET_COLOR} ${color_level}${level}${RESET_COLOR}: ${WHITE}${message}${RESET_COLOR}"
+
+  # Формирование строки для записи в файл
+  local log_file_message="${timestamp} [${level}]: ${message}"
+
+  # Вывод в терминал
+  echo -e "$log_message"
+
+  # Запись в лог-файл
+  echo "$log_file_message" >> "$LOG_FILE"
 }
 
 # Функция для добавления строки в /etc/sudoers
