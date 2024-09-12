@@ -17,7 +17,7 @@ TEST_SERVER_PASSWORD="HdfyfzHfyf_2034"
 declare -A repos
 repos["crm.name"]="CRM (crm.cargonomica.com)"
 repos["crm.git"]="git@gitlab:bitrix-php/crm.git"
-repos["crm.local"]="/home/$USER/www/crm"
+repos["crm.local"]="${HOME}/www/crm"
 repos["crm.remote"]="/home/bitrix/ext_www/p3.crm.b24dev.corp.ppricep.ru"
 repos["crm.url"]="https://p3.crm.b24dev.corp.ppricep.ru"
 repos["crm.common"]="false"
@@ -27,7 +27,7 @@ repos["crm.update"]="true"
 
 repos["wagnermaier.name"]="wagnermaier (wagnermaier.com)"
 repos["wagnermaier.git"]="git@gitlab:bitrix-php/wagnermaier.git"
-repos["wagnermaier.local"]="/home/$USER/www/wagnermaier"
+repos["wagnermaier.local"]="${HOME}/www/wagnermaier"
 repos["wagnermaier.remote"]="/home/bitrix/ext_www/p3.wagnermaier.b24dev.corp.ppricep.ru"
 repos["wagnermaier.url"]="https://p3.wagnermaier.b24dev.corp.ppricep.ru"
 repos["wagnermaier.common"]="false"
@@ -37,7 +37,7 @@ repos["wagnermaier.update"]="true"
 
 # repos["main.name"]="main (cargonomica.com)"
 # repos["main.git"]="git@gitlab:bitrix-php/cargonomica-main.git"
-# repos["main.local"]="/home/$USER/www/main"
+# repos["main.local"]="${HOME}/www/main"
 # repos["main.remote"]="/home/bitrix/ext_www/p3.b24dev.corp.ppricep.ru"
 # repos["main.url"]="https://p3.b24dev.corp.ppricep.ru"
 # repos["main.common"]="false"
@@ -47,7 +47,7 @@ repos["wagnermaier.update"]="true"
 
 repos["local.name"]="local (project/local)"
 repos["local.git"]="git@gitlab:bitrix-php/core-local.git"
-repos["local.local"]="/home/$USER/www/_core/local"
+repos["local.local"]="${HOME}/www/_core/local"
 repos["local.remote"]="/home/bitrix/p3.core/local"
 repos["local.url"]=""
 repos["local.common"]="true"
@@ -57,7 +57,7 @@ repos["local.update"]="true"
 
 repos["bitrix.name"]="bitrix (project/bitrix)"
 repos["bitrix.git"]="git@gitlab:bitrix-php/core-bitrix.git"
-repos["bitrix.local"]="/home/$USER/www/_core/bitrix"
+repos["bitrix.local"]="${HOME}/www/_core/bitrix"
 repos["bitrix.remote"]="/home/bitrix/p3.core/bitrix"
 repos["bitrix.url"]=""
 repos["bitrix.common"]="true"
@@ -67,7 +67,7 @@ repos["bitrix.update"]="false"
 
 repos["vendor.name"]="vendor (project/vendor)"
 repos["vendor.git"]="git@gitlab:bitrix-php/core-vendor.git"
-repos["vendor.local"]="/home/$USER/www/_core/vendor"
+repos["vendor.local"]="${HOME}/www/_core/vendor"
 repos["vendor.remote"]="/home/bitrix/p3.core/vendor"
 repos["vendor.url"]=""
 repos["vendor.common"]="true"
@@ -84,7 +84,6 @@ repos_list=(
     "vendor"
 )
 
-
 run() {
     local fn="$1"
     log "start $1"
@@ -95,7 +94,10 @@ run() {
 # Функция для логирования
 log() {
     local message="$1"
-    echo "$(date +'%Y-%m-%d %H:%M:%S') - ${message}" | tee -a "/home/$USER/installer.log"
+    local yellow='\033[1;33m'  # Желтый цвет
+    local green='\033[1;32m'   # Ярко-зеленый цвет
+    local reset='\033[0m'      # Сброс цвета
+    echo -e "$(date +'%Y-%m-%d %H:%M:%S' | awk -v yellow="$yellow" -v reset="$reset" '{print yellow $0 reset}') - ${message}" | tee -a "${HOME}/installer.log" | awk -v green="$green" -v reset="$reset" '{print $0}' | sed "s/${message}/${green}${message}${reset}/"
 }
 
 # Функция для добавления строки в /etc/sudoers
@@ -114,13 +116,12 @@ add_sudoers_entry() {
     echo "$entry" | sudo tee -a /etc/sudoers > /dev/null
 }
 
-
 # Функция для обновления системы и установки базовых пакетов
 install_dependencies() {
     log "Обновление системы и установка зависимостей..."
     sudo apt-get update && sudo apt-get upgrade -y
     sudo apt-get install -y software-properties-common curl wget lsb-release apt-transport-https
-    sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor rsync inotify-tools gawk jq wslu sshpass msmtp sshfs
+    sudo apt-get install -y mc nginx mysql-server postgresql redis-server git composer logrotate supervisor rsync inotify-tools gawk wslu sshpass msmtp sshfs
     sudo add-apt-repository -y ppa:ondrej/php
     sudo apt-get update
     sudo apt-get install -y php8.2 php8.2-fpm
@@ -146,21 +147,21 @@ configure_services() {
     done
 }
 
-# Функция для создания файла /home/$USER/.ssh/config от имени обычного пользователя
+# Функция для создания файла ${HOME}/.ssh/config от имени обычного пользователя
 setup_ssh() {
     log "Настройка SSH..."
-    if [[ ! -f /home/$USER/.ssh/id_rsa ]]; then
-        ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f "/home/$USER/.ssh/id_rsa" -N ""
+    if [[ ! -f ${HOME}/.ssh/id_rsa ]]; then
+        ssh-keygen -t rsa -b 4096 -C "${EMAIL}" -f "${HOME}/.ssh/id_rsa" -N ""
     else
         log "SSH-ключ уже существует."
     fi
-    mkdir -p "/home/$USER/.ssh"
-    cat << EOF > "/home/$USER/.ssh/config"
+    mkdir -p "${HOME}/.ssh"
+    cat << EOF > "${HOME}/.ssh/config"
 Host gitlab
     HostName gitlab.cargonomica.com
     User git
     Port 4122
-    IdentityFile /home/$USER/.ssh/id_rsa
+    IdentityFile ${HOME}/.ssh/id_rsa
     Compression yes
     ServerAliveInterval 60
     StrictHostKeyChecking no
@@ -169,7 +170,7 @@ Host dev-server
     HostName 172.16.10.70
     Port 4122
     User ${DEV_SERVER_LOGIN}
-    IdentityFile /home/$USER/.ssh/id_rsa
+    IdentityFile ${HOME}/.ssh/id_rsa
     Compression yes
     ServerAliveInterval 60
     StrictHostKeyChecking no
@@ -178,18 +179,18 @@ Host test-server
     HostName 172.16.10.60
     Port 4122
     User ${TEST_SERVER_LOGIN}
-    IdentityFile /home/$USER/.ssh/id_rsa
+    IdentityFile ${HOME}/.ssh/id_rsa
     Compression yes
     ServerAliveInterval 60
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
 EOF
-    [ -d "/home/$USER/.ssh" ] && chmod 700 "/home/$USER/.ssh"
-    [ -f "/home/$USER/.ssh/id_rsa" ] && chmod 600 "/home/$USER/.ssh/id_rsa"
-    [ -f "/home/$USER/.ssh/id_rsa.pub" ] && chmod 644 "/home/$USER/.ssh/id_rsa.pub"
-    [ -f "/home/$USER/.ssh/authorized_keys" ] && chmod 600 "/home/$USER/.ssh/authorized_keys"
-    [ -f "/home/$USER/.ssh/known_hosts" ] && chmod 644 "/home/$USER/.ssh/known_hosts"
-    [ -f "/home/$USER/.ssh/config" ] && chmod 600 "/home/$USER/.ssh/config"
+    [ -d "${HOME}/.ssh" ] && chmod 700 "${HOME}/.ssh"
+    [ -f "${HOME}/.ssh/id_rsa" ] && chmod 600 "${HOME}/.ssh/id_rsa"
+    [ -f "${HOME}/.ssh/id_rsa.pub" ] && chmod 644 "${HOME}/.ssh/id_rsa.pub"
+    [ -f "${HOME}/.ssh/authorized_keys" ] && chmod 600 "${HOME}/.ssh/authorized_keys"
+    [ -f "${HOME}/.ssh/known_hosts" ] && chmod 644 "${HOME}/.ssh/known_hosts"
+    [ -f "${HOME}/.ssh/config" ] && chmod 600 "${HOME}/.ssh/config"
     sshpass -p $DEV_SERVER_PASSWORD ssh-copy-id dev-server
     sshpass -p $TEST_SERVER_PASSWORD ssh-copy-id test-server
     if [[ ! -f /usr/local/bin/clip ]]; then
@@ -197,22 +198,22 @@ EOF
     else
         log "Символическая ссылка /usr/local/bin/clip уже существует."
     fi
-    clip < "/home/$USER/.ssh/id_rsa.pub"
+    clip < "${HOME}/.ssh/id_rsa.pub"
     wslview "https://gitlab.cargonomica.com/-/profile/keys"
     read -p -r "Нажмите [Enter], когда добавите ключ на https://gitlab.cargonomica.com/-/profile/keys..."
 }
 
 create_projects_structure() {
     log "Создание структуры проектов..."
-    cd "/home/$USER" || exit
+    cd "${HOME}" || exit
     sudo chown -R "$USER:$USER" .
-    [[ ! -d /home/$USER/www ]] && mkdir -p "/home/$USER/www"
-    cd "/home/$USER/www" || exit
-    scp dev-server:/home/bitrix/backup/backup.tar.gz "/home/$USER/www/backup.tar.gz"
+    [[ ! -d ${HOME}/www ]] && mkdir -p "${HOME}/www"
+    cd "${HOME}/www" || exit
+    scp dev-server:/home/bitrix/backup/backup.tar.gz "${HOME}/www/backup.tar.gz"
     tar -xvzf backup.tar.gz
-    rm -f "/home/$USER/www/backup.tar.gz"
+    rm -f "${HOME}/www/backup.tar.gz"
     for project in crm wagnermaier; do
-        cd "/home/$USER/www/$project" || exit
+        cd "${HOME}/www/$project" || exit
         ln -s ../_core/bitrix bitrix
         ln -s ../_core/local local
         ln -s ../_core/logs logs
@@ -220,8 +221,8 @@ create_projects_structure() {
         ln -s ../_core/upload upload
         ln -s ../_core/vendor vendor
     done
-    find "/home/$USER/www" -type d -exec chmod 2775 {} \;
-    find "/home/$USER/www" -type f -exec chmod 664 {} \;
+    find "${HOME}/www" -type d -exec chmod 2775 {} \;
+    find "${HOME}/www" -type f -exec chmod 664 {} \;
 }
 
 update_deps() {
@@ -272,7 +273,7 @@ bitrix/
 upload/
 EOF
         if [ "${repos["$repo.sync"]}" = "true" ]; then
-            cat << EOF > "/home/${USER}/gsync/.${repo}.gsync"
+            cat << EOF > "${HOME}/gsync/.${repo}.gsync"
 [OPTIONS]
 source="${repos["${repo}.local"]}"
 target="dev-server:${repos["${repo}.remote"]}" 
@@ -282,22 +283,20 @@ times=true
 group=false
 owner=false
 EOF
-            cat << EOF > "/home/${USER}/gsync/gsync-${repo}.conf"
+            cat << EOF > "${HOME}/gsync/gsync-${repo}.conf"
 [program:gsync-${repo}]
-command=/home/${USER}/gsync/gsync --config=/home/${USER}/gsync/.${repo}.gsync
+command=${HOME}/gsync/gsync --config=${HOME}/gsync/.${repo}.gsync
 autostart=true
 autorestart=true
 stderr_logfile=/var/log/gsync-${repo}.err.log
 stdout_logfile=/var/log/gsync-${repo}.out.log
 EOF
-            sudo cp -f "/home/${USER}/gsync/gsync-${repo}.conf" "/etc/supervisor/conf.d/gsync-${repo}.conf"
-            sudo supervisorctl reread
-            sudo supervisorctl update
-            sudo supervisorctl start "gsync-${repo}"
+            sudo cp -f "${HOME}/gsync/gsync-${repo}.conf" "/etc/supervisor/conf.d/gsync-${repo}.conf"
+            log "Для запуска синхронизации выполнить команды:"
+            log "sudo supervisorctl reread"
+            log "sudo supervisorctl update"
+            log "sudo supervisorctl start gsync-${repo}"
         fi
-        git status
-        echo "----------------------------"
-        echo "----------------------------"
     done
 }
 
@@ -345,9 +344,8 @@ install_node() {
 }
 
 install_rsync() {
-    git clone https://github.com/e-bash/gsync.git "/home/${USER}/gsync"
-    cd gsync || exit
-    chmod +x gsync
+    git clone https://github.com/e-bash/gsync.git "${HOME}/gsync"
+    chmod +x "${HOME}/gsync/gsync"
 }
 
 # Функция для клонирования репозиториев и настройки окружения
@@ -364,17 +362,17 @@ setup_projects() {
         git pull
         git config user.name "$NAME"
         git config user.email "$EMAIL"
-        if [[ "${repos["$project.husky"]}" == "true" && ! -f "/home/$USER/.husky/_/husky.sh" ]]; then
+        if [[ "${repos["$project.husky"]}" == "true" && ! -f "${HOME}/.husky/_/husky.sh" ]]; then
             npx husky install
         else
             log "Husky уже настроен."
         fi
-        if [[ -f /home/$USER/www/${repos["$project.local"]}/composer.json ]]; then
+        if [[ -f ${HOME}/www/${repos["$project.local"]}/composer.json ]]; then
             composer install --ignore-platform-reqs
         else
             log "Файл composer.json отсутствует."
         fi
-        if [[ -f /home/$USER/www/${repos["$project.local"]}/package.json ]]; then
+        if [[ -f ${HOME}/www/${repos["$project.local"]}/package.json ]]; then
             yarn install --network-timeout=100000
         else
             log "Файл package.json отсутствует."
@@ -388,10 +386,8 @@ setup_projects() {
 mount_sshfs() {
     mkdir -p ~/remote_mount
     sshfs user@example.com:/var/www ~/remote_mount
-#    fusermount -u ~/remote_mount # размонтирование linux
-# umount ~/remote_mount # размонтирование macos
-
-
+    # fusermount -u ~/remote_mount # размонтирование linux
+    # umount ~/remote_mount # размонтирование macos
 }
 
 # Выполнение всех действий
