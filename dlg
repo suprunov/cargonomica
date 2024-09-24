@@ -250,20 +250,20 @@ request_user_input() { # Функция для запроса параметро
     NAME=$(get_value "Введите ваше имя:" "$NAME")
     EMAIL=$(get_value "Введите ваш email:" "$EMAIL")
     SELECTED_BASIC_DEPS=$(select_group "Выберите зависимости для установки:" BASIC_DEPS)
-    if [[ " ${SELECTED_BASIC_DEPS} " =~ "php" ]]; then
+    if [[ " ${SELECTED_BASIC_DEPS} " =~ " php " ]]; then
         PHP_VERSION=$(select_item "Выберите версию PHP для установки" PHP_VERSIONS "8.2")
     fi
 
-    if [[ " ${SELECTED_BASIC_DEPS} " =~ "nodejs" ]]; then
+    if [[ " ${SELECTED_BASIC_DEPS} " =~ " nodejs " ]]; then
         NODE_VERSION=$(select_item "Выберите версию Node.js для установки" NODE_VERSIONS "22")
     fi
 
-    if [[ " ${SELECTED_BASIC_DEPS} " =~ "mysql" ]]; then
+    if [[ " ${SELECTED_BASIC_DEPS} " =~ " mysql " ]]; then
         LOCAL_MYSQL_USER=$(get_value "Введите имя пользователя для MySQL:" "$LOCAL_MYSQL_USER")
         LOCAL_MYSQL_PASSWORD=$(get_value "Введите имя пользователя для MySQL:" "$LOCAL_MYSQL_PASSWORD")
     fi
 
-    if [[ " ${SELECTED_BASIC_DEPS} " =~ "postgresql" ]]; then
+    if [[ " ${SELECTED_BASIC_DEPS} " =~ " postgresql " ]]; then
         LOCAL_PGSQL_USER=$(get_value "Введите имя пользователя для MySQL:" "$LOCAL_PGSQL_USER")
         LOCAL_PGSQL_PASSWORD=$(get_value "Введите имя пользователя для MySQL:" "$LOCAL_PGSQL_PASSWORD")
     fi
@@ -271,9 +271,14 @@ request_user_input() { # Функция для запроса параметро
 
 install_selected_dependencies() { 
     log "Установка выбранных зависимостей..."
-    log "Выбранные зависимости: ${SELECTED_BASIC_DEPS[@]}"  # Логирование выбранных зависимостей
-    for dep in "${SELECTED_BASIC_DEPS[@]}"; do
-        if [[ " $dep " =~ "nodejs" ]]; then
+    log "Выбранные зависимости: ${SELECTED_BASIC_DEPS}"  # Логирование выбранных зависимостей
+
+    # Разбиваем строку на массив
+    IFS=' ' read -r -a selected_deps <<< "$SELECTED_BASIC_DEPS"
+
+    for dep in "${selected_deps[@]}"; do
+        log "Обработка зависимости: $dep"  # Логирование текущей зависимости
+        if [[ "$dep" == "nodejs" ]]; then
             log "Установка Node.js версии ${NODE_VERSION}..."
             if sudo snap install node --channel="${NODE_VERSION}" --classic; then
                 log "Node.js версии ${NODE_VERSION} успешно установлен."
@@ -281,14 +286,14 @@ install_selected_dependencies() {
                 log "Ошибка при установке Node.js."
             fi
             sudo npm install -g npm@latest
-        elif [[ " $dep " =~ "php" ]]; then
+        elif [[ "$dep" == "php" ]]; then
             log "Установка PHP версии $PHP_VERSION..."
             if sudo apt-get install -y "php${PHP_VERSION}" "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-mysql" "php${PHP_VERSION}-pgsql"; then
                 log "PHP версии $PHP_VERSION успешно установлен."
             else
                 log "Ошибка при установке PHP."
             fi
-        elif [[ " $dep " =~ "mysql" ]]; then
+        elif [[ "$dep" == "mysql" ]]; then
             log "Установка MySQL..."
             if sudo apt-get install -y mysql-server; then
                 log "MySQL успешно установлен."
@@ -298,7 +303,7 @@ install_selected_dependencies() {
             else
                 log "Ошибка при установке MySQL."
             fi
-        elif [[ " $dep " =~ "postgresql" ]]; then
+        elif [[ "$dep" == "postgresql" ]]; then
             log "Установка PostgreSQL..."
             if sudo apt-get install -y postgresql; then
                 log "PostgreSQL успешно установлен."
@@ -307,14 +312,14 @@ install_selected_dependencies() {
             else
                 log "Ошибка при установке PostgreSQL."
             fi
-        elif [[ " $dep " =~ "nginx" ]]; then
+        elif [[ "$dep" == "nginx" ]]; then
             log "Установка Nginx..."
             if sudo apt-get install -y nginx; then
                 log "Nginx успешно установлен."
             else
                 log "Ошибка при установке Nginx."
             fi
-        elif [[ " $dep " =~ "apache2" ]]; then
+        elif [[ "$dep" == "apache2" ]]; then
             log "Установка Apache2..."
             if sudo apt-get install -y apache2; then
                 log "Apache2 успешно установлен."
