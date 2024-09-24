@@ -286,6 +286,7 @@ request_user_input() { # Функция для запроса параметро
 
 install_selected_dependencies() { # Функция для установки выбранных зависимостей
     log "Установка выбранных зависимостей..."
+    log "Выбранные зависимости: ${SELECTED_BASIC_DEPS[@]}"  # Добавьте эту строку
     for dep in "${SELECTED_BASIC_DEPS[@]}"; do
         if [[ " $dep " =~ "nodejs" ]]; then
             log "Установка Node.js версии ${NODE_VERSION}..."
