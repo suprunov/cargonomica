@@ -269,9 +269,10 @@ request_user_input() { # Функция для запроса параметро
     fi
 }
 
-install_selected_dependencies() { # Функция для установки выбранных зависимостей
+install_selected_dependencies() { 
     log "Установка выбранных зависимостей..."
-    for dep in "${SELECTED_BASIC_DEPS}"; do
+    log "Выбранные зависимости: ${SELECTED_BASIC_DEPS[@]}"  # Логирование выбранных зависимостей
+    for dep in "${SELECTED_BASIC_DEPS[@]}"; do
         if [[ " $dep " =~ "nodejs" ]]; then
             log "Установка Node.js версии ${NODE_VERSION}..."
             if sudo snap install node --channel="${NODE_VERSION}" --classic; then
@@ -330,6 +331,7 @@ install_selected_dependencies() { # Функция для установки в�
         fi
     done
 }
+
 
 
 install_dependencies
