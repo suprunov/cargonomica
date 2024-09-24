@@ -1,4 +1,6 @@
 #!/bin/bash
+# curl -sSL https://raw.githubusercontent.com/suprunov/envmaker/refs/heads/master/dlg | bash
+
 
 LOG_FILE=~/installer.log
 echo "Начало установки" > "$LOG_FILE"
