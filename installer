@@ -171,12 +171,12 @@ install_dependencies() {
 
 # Функция для создания пользователей MySQL и PostgresSQL с полными привилегиями
 create_db_users() {
-    log "Создание пользователей баз данных..."
-    sudo mysql -e "CREATE USER '${LOCAL_MYSQL_USER}'@'localhost' IDENTIFIED BY '${LOCAL_MYSQL_PASSWORD}';"
-    sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO '${LOCAL_MYSQL_USER}'@'localhost' WITH GRANT OPTION;"
-    sudo mysql -e "FLUSH PRIVILEGES;"
-    sudo -u postgres psql -c "CREATE USER ${LOCAL_PGSQL_USER} WITH PASSWORD '${LOCAL_PGSQL_PASSWORD}';"
-    sudo -u postgres psql -c "ALTER USER ${LOCAL_PGSQL_USER} WITH SUPERUSER;"
+   # log "Создание пользователей баз данных..."
+   # sudo mysql -e "CREATE USER '${LOCAL_MYSQL_USER}'@'localhost' IDENTIFIED BY '${LOCAL_MYSQL_PASSWORD}';"
+   # sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO '${LOCAL_MYSQL_USER}'@'localhost' WITH GRANT OPTION;"
+   # sudo mysql -e "FLUSH PRIVILEGES;"
+   # sudo -u postgres psql -c "CREATE USER ${LOCAL_PGSQL_USER} WITH PASSWORD '${LOCAL_PGSQL_PASSWORD}';"
+   # sudo -u postgres psql -c "ALTER USER ${LOCAL_PGSQL_USER} WITH SUPERUSER;"
 }
 
 # Функция для настройки сервисов после установки
@@ -209,7 +209,7 @@ Host gitlab
     UserKnownHostsFile=/dev/null
 Host dev-server
     HostName 172.16.10.70
-    Port 4122
+    Port 22
     User ${DEV_SERVER_LOGIN}
     IdentityFile ${HOME}/.ssh/id_rsa
     Compression yes
@@ -269,7 +269,7 @@ create_projects_structure() {
 update_deps() {
     sudo apt update
     sudo apt upgrade -y
-    set_locale
+    #set_locale
     sudo apt install mc -y
     add_sudoers_entry "$USER"
 }
