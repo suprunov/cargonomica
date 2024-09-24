@@ -1,0 +1,536 @@
+#!/bin/bash
+
+# Скрипт для установки окружения и зависимостей с интерактивным вводом
+
+LOG_FILE=~/installer.log
+echo "Начало установки" > "$LOG_FILE"
+
+# Переменные по умолчанию
+USERNAME=$USER                             # Имя пользователя
+NAME="Your name"
+EMAIL="${USERNAME}@cargonomica.com"            # Электронная почта пользователя
+LOCAL_MYSQL_USER="$USERNAME"               # Пользователь MySQL
+LOCAL_MYSQL_PASSWORD="qazqaz012" # Пароль MySQL
+LOCAL_PGSQL_USER="$USERNAME"               # Пользователь PostgreSQL
+LOCAL_PGSQL_PASSWORD="qazqaz012" # Пароль PostgreSQL
+
+# Массив доступных зависимостей
+DEPENDENCIES=("php" "nodejs" "mysql" "postgresql" "curl" "git" "unzip" "wget" "apache2" 
+              "software-properties-common" "lsb-release"
+              "apt-transport-https" "mc" "nginx" "redis-server" 
+              "composer" "logrotate" "supervisor" "rsync" 
+              "inotify-tools" "gawk" "wslu" "sshpass" 
+              "msmtp" "sshfs")
+
+declare -A deps=(
+    ["php"]="Основной пакет интерпретатора PHP."
+    ["nodejs"]="JavaScript-движок для серверного программирования."
+    ["mysql"]="Система управления базами данных (СУБД)."
+    ["postgresql"]="Расширенная реляционная СУБД с поддержкой SQL."
+    ["curl"]="Инструмент для работы с URL и HTTP-запросами."
+    ["git"]="Система контроля версий для управления кодом."
+    ["unzip"]="Утилита для распаковки ZIP-архивов."
+    ["wget"]="Инструмент для загрузки файлов по HTTP, HTTPS и FTP."
+    ["apache2"]="Веб-сервер для хостинга веб-приложений."
+    ["software-properties-common"]="Утилиты для управления PPA и репозиториями."
+    ["lsb-release"]="Информация о версии дистрибутива Linux."
+    ["apt-transport-https"]="Поддержка HTTPS в apt."
+    ["mc"]="Midnight Commander, текстовый файловый менеджер."
+    ["nginx"]="Высокопроизводительный веб-сервер и реверс-прокси."
+    ["redis-server"]="Сервер in-memory базы данных Redis."
+    ["composer"]="Управление зависимостями для PHP-проектов."
+    ["logrotate"]="Утилита для управления логами системы."
+    ["supervisor"]="Управление процессами и демонами."
+    ["rsync"]="Инструмент для синхронизации файлов и каталогов."
+    ["inotify-tools"]="Инструменты для мониторинга файловых систем."
+    ["gawk"]="Расширенная версия AWK для обработки текстов."
+    ["wslu"]="Утилиты для работы с Windows Subsystem for Linux."
+    ["sshpass"]="Утилита для передачи паролей в SSH."
+    ["msmtp"]="SMTP-клиент для отправки электронных писем."
+    ["sshfs"]="Файловая система для монтирования удаленных каталогов по SSH."
+)
+
+declare -A php_deps=(
+    ["php-fpm"]="Менеджер процессов для PHP, улучшает производительность."
+    ["php-cli"]="Интерфейс командной строки для запуска PHP-скриптов."
+    ["php-mysql"]="Модуль для работы с базами данных MySQL."
+    ["php-pgsql"]="Модуль для работы с PostgreSQL."
+    ["php-redis"]="Модуль для работы с Redis, in-memory хранилище."
+    ["php-xml"]="Библиотека для работы с XML-данными."
+    ["php-mbstring"]="Работа с многобайтовыми строками (UTF-8)."
+    ["php-zip"]="Модуль для работы с ZIP-архивами."
+    ["php-curl"]="Модуль для HTTP-запросов с помощью CURL."
+    ["php-gd"]="Библиотека для работы с изображениями."
+    ["php-soap"]="Модуль для работы с SOAP веб-сервисами."
+    ["php-intl"]="Интернационализация (форматы дат и чисел)."
+    ["php-bcmath"]="Интернационализация (форматы дат и чисел)."
+    ["php-opcache"]="Кэширование байт-кода PHP для ускорения."
+    ["php-imap"]="Работа с почтовыми протоколами IMAP."
+    ["php-xdebug"]="Расширение для отладки PHP-приложений."
+    ["php-ldap"]="Работа с LDAP (каталоги и аутентификация)."
+)
+
+declare -A node_deps=(
+      ["yarn"]="Менеджер пакетов для JavaScript."
+      ["vite"]="Сборщик и сервер для фронтенд-разработки."
+      ["pm2"]="Процессный менеджер для Node.js приложений."
+      ["postgresql"]="Система управления реляционными базами данных."
+      ["sequelize"]="ORM для работы с SQL-базами данных."
+      ["nodemon"]="Утилита для автоматической перезагрузки Node.js приложений."
+      ["mysql"]="Система управления реляционными базами данных."
+      ["husky"]="Инструменты для работы с git-хуками."
+)
+
+declare -A php_versions=(
+      ["8.2"]="PHP 8.2"
+      ["8.3"]="PHP 8.3"
+)
+
+declare -A node_versions=(
+      ["20"]="Node.js v20.x"
+      ["22"]="Node.js v22.x"
+      ["21"]="Node.js v21.x"
+      ["23"]="Node.js v23.x"
+)
+
+SELECTED_DEPENDENCIES=()                # Массив для выбранных зависимостей
+PHP_VERSION="8.2"                       # Версия PHP
+NODE_VERSION="22/stable"                # Версия Node.js
+
+log() { # Функция для логирования сообщений с указанием уровня
+    local message="$1"
+    local timestamp
+    timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "$timestamp: $message" >> "$LOG_FILE"
+}
+
+install_dependencies() { # Функция для установки зависимостей
+    log "Обновление зависимостей..."
+    if sudo apt-get update && sudo apt-get upgrade -y; then
+        log "Обновление завершено."
+    else
+        log "Ошибка при обновлении пакетов."
+        exit 1  # Выход при ошибке обновления
+    fi
+
+    for pkg in mc dialog; do
+        if ! dpkg -l | grep -q "$pkg"; then
+            log "Установка $pkg..."
+            if sudo apt-get install -y "$pkg"; then
+                log "$pkg успешно установлен."
+            else
+                log "Ошибка при установке $pkg."
+                exit 1  # Выход при ошибке установки
+            fi
+        else
+            log "$pkg уже установлен."
+        fi
+    done
+}
+
+request_user_input() { # Функция для запроса параметров пользователя с помощью dialog
+    if ! command -v dialog &> /dev/null; then
+        log "Команда dialog не найдена. Убедитесь, что она установлена."
+        exit 1  # Выход при отсутствии dialog
+    fi
+
+    USERNAME=$(dialog --inputbox "Введите имя пользователя:" 8 40 "$USER" --stdout)
+    if [ $? -ne 0 ]; then log "Ошибка ввода имени."; exit 1; fi
+
+    NAME=$(dialog --inputbox "Введите ваше имя:" 8 40 "$NAME" --stdout)
+    if [ $? -ne 0 ]; then log "Ошибка ввода имени."; exit 1; fi
+
+    EMAIL=$(dialog --inputbox "Введите ваш email:" 8 40 "$EMAIL" --stdout)
+    if [ $? -ne 0 ]; then log "Ошибка ввода email."; exit 1; fi
+
+    SELECTED_DEPENDENCIES=($(dialog --checklist "Выберите зависимости для установки:" 20 60 10 \
+        1 "PHP" on \
+        2 "Node.js" on \
+        3 "MySQL" on \
+        4 "PostgreSQL" on \
+        5 "curl" on \
+        6 "git" on \
+        7 "unzip" on \
+        8 "wget" on \
+        9 "apache2" on \
+        10 "software-properties-common" on \
+        11 "lsb-release" on \
+        12 "apt-transport-https" on \
+        13 "mc" on \
+        14 "nginx" on \
+        15 "redis-server" on \
+        16 "composer" on \
+        17 "logrotate" on \
+        18 "supervisor" on \
+        19 "rsync" on \
+        20 "inotify-tools" on \
+        21 "gawk" on \
+        22 "wslu" on \
+        23 "sshpass" on \
+        24 "msmtp" on \
+        25 "sshfs" on --stdout))
+
+    if [ $? -ne 0 ]; then log "Ошибка при выборе зависимостей."; exit 1; fi
+
+    # Проверка, выбрана ли PHP
+    if [[ " ${SELECTED_DEPENDENCIES[@]} " =~ " 1 " ]]; then
+        PHP_VERSION=$(dialog --inputbox "Введите версию PHP (7.4, 8.2, 8.3):" 8 40 "8.2" --stdout)
+        if [ $? -ne 0 ]; then log "Ошибка ввода версии PHP."; exit 1; fi
+    fi
+
+    # Проверка, выбрана ли Node.js
+    if [[ " ${SELECTED_DEPENDENCIES[@]} " =~ " 2 " ]]; then
+        NODE_VERSION=$(dialog --inputbox "Введите версию Node.js (например, 22/stable):" 8 40 "22/stable" --stdout)
+        if [ $? -ne 0 ]; then log "Ошибка ввода версии Node.js."; exit 1; fi
+    fi
+
+    # Проверка, выбрана ли MySQL
+    if [[ " ${SELECTED_DEPENDENCIES[@]} " =~ " 3 " ]]; then
+        LOCAL_MYSQL_USER=$(dialog --inputbox "Введите имя пользователя для MySQL:" 8 40 "$USERNAME" --stdout)
+        if [ $? -ne 0 ]; then log "Ошибка ввода имени пользователя MySQL."; exit 1; fi
+
+        LOCAL_MYSQL_PASSWORD=$(dialog --inputbox "Введите пароль для MySQL:" 8 40 "qazqaz012" --stdout)
+        if [ $? -ne 0 ]; then log "Ошибка ввода пароля MySQL."; exit 1; fi
+    fi
+
+    # Проверка, выбрана ли PostgreSQL
+    if [[ " ${SELECTED_DEPENDENCIES[@]} " =~ " 4 " ]]; then
+        LOCAL_PGSQL_USER=$(dialog --inputbox "Введите имя пользователя для PostgreSQL:" 8 40 "$USERNAME" --stdout)
+        if [ $? -ne 0 ]; then log "Ошибка ввода имени пользователя PostgreSQL."; exit 1; fi
+
+        LOCAL_PGSQL_PASSWORD=$(dialog --inputbox "Введите пароль для PostgreSQL:" 8 40 "qazqaz012" --stdout)
+        if [ $? -ne 0 ]; then log "Ошибка ввода пароля PostgreSQL."; exit 1; fi
+    fi
+}
+
+
+install_selected_dependencies() { # Функция для установки выбранных зависимостей
+    log "Установка выбранных зависимостей..."
+
+    for dep in "${SELECTED_DEPENDENCIES[@]}"; do
+        case $dep in
+            1)  # PHP
+                log "Установка PHP версии $PHP_VERSION..."
+                if sudo apt-get install -y "php${PHP_VERSION}" "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-mysql" "php${PHP_VERSION}-pgsql"; then
+                    log "PHP версии $PHP_VERSION успешно установлен."
+                else
+                    log "Ошибка при установке PHP."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            2)  # Node.js
+                log "Установка Node.js версии $NODE_VERSION..."
+                if sudo snap install node --channel=$NODE_VERSION --classic; then
+                    log "Node.js версии $NODE_VERSION успешно установлен."
+                else
+                    log "Ошибка при установке Node.js."
+                    exit 1  # Выход при ошибке установки
+                fi
+                sudo npm install -g npm@latest  # Установка последней версии npm
+                ;;
+            3)  # MySQL
+                log "Установка MySQL..."
+                if sudo apt-get install -y mysql-server; then
+                    log "MySQL успешно установлен."
+                    log "Создание пользователя MySQL..."
+                    sudo mysql -e "CREATE USER '${LOCAL_MYSQL_USER}'@'localhost' IDENTIFIED BY '${LOCAL_MYSQL_PASSWORD}';"
+                    sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO '${LOCAL_MYSQL_USER}'@'localhost' WITH GRANT OPTION;"
+                else
+                    log "Ошибка при установке MySQL."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            4)  # PostgreSQL
+                log "Установка PostgreSQL..."
+                if sudo apt-get install -y postgresql; then
+                    log "PostgreSQL успешно установлен."
+                    log "Создание пользователя PostgreSQL..."
+                    sudo -u postgres psql -c "CREATE USER ${LOCAL_PGSQL_USER} WITH PASSWORD '${LOCAL_PGSQL_PASSWORD}';"
+                else
+                    log "Ошибка при установке PostgreSQL."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            5)  # curl
+                log "Установка curl..."
+                if sudo apt-get install -y curl; then
+                    log "curl успешно установлен."
+                else
+                    log "Ошибка при установке curl."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            6)  # git
+                log "Установка git..."
+                if sudo apt-get install -y git; then
+                    log "git успешно установлен."
+                else
+                    log "Ошибка при установке git."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            7)  # unzip
+                log "Установка unzip..."
+                if sudo apt-get install -y unzip; then
+                    log "unzip успешно установлен."
+                else
+                    log "Ошибка при установке unzip."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            8)  # wget
+                log "Установка wget..."
+                if sudo apt-get install -y wget; then
+                    log "wget успешно установлен."
+                else
+                    log "Ошибка при установке wget."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            9)  # apache2
+                log "Установка apache2..."
+                if sudo apt-get install -y apache2; then
+                    log "apache2 успешно установлен."
+                else
+                    log "Ошибка при установке apache2."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            10) # software-properties-common
+                log "Установка software-properties-common..."
+                if sudo apt-get install -y software-properties-common; then
+                    log "software-properties-common успешно установлен."
+                else
+                    log "Ошибка при установке software-properties-common."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            11) # lsb-release
+                log "Установка lsb-release..."
+                if sudo apt-get install -y lsb-release; then
+                    log "lsb-release успешно установлен."
+                else
+                    log "Ошибка при установке lsb-release."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            12) # apt-transport-https
+                log "Установка apt-transport-https..."
+                if sudo apt-get install -y apt-transport-https; then
+                    log "apt-transport-https успешно установлен."
+                else
+                    log "Ошибка при установке apt-transport-https."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            13) # mc
+                log "Установка mc..."
+                if sudo apt-get install -y mc; then
+                    log "mc успешно установлен."
+                else
+                    log "Ошибка при установке mc."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            14) # nginx
+                log "Установка nginx..."
+                if sudo apt-get install -y nginx; then
+                    log "nginx успешно установлен."
+                else
+                    log "Ошибка при установке nginx."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            15) # redis-server
+                log "Установка redis-server..."
+                if sudo apt-get install -y redis-server; then
+                    log "redis-server успешно установлен."
+                else
+                    log "Ошибка при установке redis-server."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            16) # composer
+                log "Установка composer..."
+                if sudo apt-get install -y composer; then
+                    log "composer успешно установлен."
+                else
+                    log "Ошибка при установке composer."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            17) # logrotate
+                log "Установка logrotate..."
+                if sudo apt-get install -y logrotate; then
+                    log "logrotate успешно установлен."
+                else
+                    log "Ошибка при установке logrotate."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            18) # supervisor
+                log "Установка supervisor..."
+                if sudo apt-get install -y supervisor; then
+                    log "supervisor успешно установлен."
+                else
+                    log "Ошибка при установке supervisor."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            19) # rsync
+                log "Установка rsync..."
+                if sudo apt-get install -y rsync; then
+                    log "rsync успешно установлен."
+                else
+                    log "Ошибка при установке rsync."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            20) # inotify-tools
+                log "Установка inotify-tools..."
+                if sudo apt-get install -y inotify-tools; then
+                    log "inotify-tools успешно установлен."
+                else
+                    log "Ошибка при установке inotify-tools."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            21) # gawk
+                log "Установка gawk..."
+                if sudo apt-get install -y gawk; then
+                    log "gawk успешно установлен."
+                else
+                    log "Ошибка при установке gawk."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            22) # wslu
+                log "Установка wslu..."
+                if sudo apt-get install -y wslu; then
+                    log "wslu успешно установлен."
+                else
+                    log "Ошибка при установке wslu."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            23) # sshpass
+                log "Установка sshpass..."
+                if sudo apt-get install -y sshpass; then
+                    log "sshpass успешно установлен."
+                else
+                    log "Ошибка при установке sshpass."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            24) # msmtp
+                log "Установка msmtp..."
+                if sudo apt-get install -y msmtp; then
+                    log "msmtp успешно установлен."
+                else
+                    log "Ошибка при установке msmtp."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+            25) # sshfs
+                log "Установка sshfs..."
+                if sudo apt-get install -y sshfs; then
+                    log "sshfs успешно установлен."
+                else
+                    log "Ошибка при установке sshfs."
+                    exit 1  # Выход при ошибке установки
+                fi
+                ;;
+        esac
+    done
+}
+
+# Функция для выбора группы элементов с использованием чекбоксов
+select_group() {
+    local title="$1"
+    declare -n deps="$2"
+    local order=()
+    local options=()
+
+    # Сортируем ключи алфавитно
+    for key in "${!deps[@]}"; do
+        order+=("$key")
+    done
+
+    # Используем sort для сортировки ключей
+    IFS=$'\n' read -r -d '' -a sorted_keys < <(printf '%s\n' "${order[@]}" | sort -z)
+    unset IFS
+
+    # Формируем список опций
+    for key in "${sorted_keys[@]}"; do
+        options+=("$key" "${deps[$key]}" "on")
+    done
+
+    # Запускаем диалоговое окно выбора
+    if ! selected=$(dialog --checklist "$title" 20 60 12 "${options[@]}" --stdout); then
+        echo ""
+        return 0
+    fi
+
+    IFS=' ' read -r -a selected_keys <<< "$selected"
+    local ordered_selected_keys=()
+    for key in "${sorted_keys[@]}"; do
+        if [[ " ${selected_keys[*]} " == *" $key "* ]]; then
+            ordered_selected_keys+=("$key")
+        fi
+    done
+    echo "${ordered_selected_keys[@]}"
+}
+
+
+select_item() {
+    local title="$1"
+    local -n items="$2"
+    local default_key="$3"
+    options=()
+
+    # Собираем ключи в массив
+    keys=("${!items[@]}")
+
+    # Добавляем значения в обратном порядке
+    for ((i=${#keys[@]}-1; i>=0; i--)); do
+        key="${keys[i]}"
+        if [[ "$key" == "$default_key" ]]; then
+            options+=("$key" "${items[$key]}" "on")
+        else
+            options+=("$key" "${items[$key]}" "")
+        fi
+    done
+
+    # Запускаем диалоговое окно выбора с радиокнопками
+    selection=$(dialog --title "$title" --radiolist "Выберите элемент:" 15 50 10 "${options[@]}" 3>&1 1>&2 2>&3)
+
+    if [ $? -eq 0 ]; then
+        echo "$selection"
+    else
+        echo ""  # Возвращаем пустую строку при отмене
+    fi
+}
+
+
+
+
+
+
+
+
+
+# Вызов функции и вывод выбранных ключей
+selected_php_deps=$(select_group "Выберите PHP зависимости" php_deps)
+selected_node_version=$(select_item "Выберите версию Node" node_versions "21")
+echo "Выбранные зависимости PHP: $selected_php_deps"
+echo "Выбранная версия Node: $selected_node_version"
+
+# Основная функция, которая запускает другие функции
+#main() {
+#    install_dependencies       # Шаг 1: Установка зависимостей
+#    request_user_input         # Шаг 2: Запрос параметров пользователя
+#    install_selected_dependencies  # Шаг 3: Установка выбранных зависимостей
+#}
+#
+## Запуск основной функции
+#main
