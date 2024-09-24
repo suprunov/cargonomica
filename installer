@@ -440,6 +440,6 @@ run create_db_users
 run configure_services
 run setup_ssh
 run create_projects_structure
-run install_rsync
+# run install_rsync
 run git_settings
 log "Скрипт выполнен успешно."
