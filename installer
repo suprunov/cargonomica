@@ -435,8 +435,8 @@ mount_sshfs() {
 log "Начинаю выполнение скрипта..."
 run update_deps
 run install_dependencies
-run install_node
-run create_db_users
+# run install_node
+# run create_db_users
 run configure_services
 run setup_ssh
 run create_projects_structure
