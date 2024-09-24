@@ -346,6 +346,6 @@ install_selected_dependencies() { # Функция для установки в�
 }
 
 
-#install_dependencies
+install_dependencies
 request_user_input
 install_selected_dependencies
