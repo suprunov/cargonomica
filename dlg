@@ -1,7 +1,6 @@
 #!/bin/bash
+
 # sudo apt-get update && sudo apt-get install -y dialog && curl -sSL https://raw.githubusercontent.com/suprunov/envmaker/refs/heads/master/dlg | bash
-
-
 
 LOG_FILE=~/installer.log
 echo "Начало установки" > "$LOG_FILE"
@@ -93,7 +92,6 @@ log() { # Функция для логирования сообщений с у�
     echo "$timestamp: $message" >> "$LOG_FILE"
 }
 
-#-------------------------------------------- обертка для dialog
 select_group() {
     local title="$1"
     local deps
@@ -223,19 +221,6 @@ get_content() { # Функция для отображения содержим�
     fi
 }
 
-#is_confirmed=$(get_bool "Вы уверены, что хотите продолжить?")
-#user_value=$(get_value "Введите ваше имя:" "Имя по умолчанию")
-#user_password=$(get_password "Введите пароль:")
-#show_file "Содержимое файла" "/home/ssuprunov/.bashrc"
-#selected_php_deps=$(select_group "Выберите PHP зависимости" php_deps)
-#selected_node_version=$(select_item "Выберите версию Node" node_versions "21")
-#echo "Выбранные зависимости PHP: $selected_php_deps"
-#echo "Выбранная версия Node: $selected_node_version"
-#echo "Ответ: $is_confirmed"
-#echo "Ваше имя: $user_value"
-#echo "Ваш пароль: $user_password"
-#-------------------------------------------- обертка для dialog
-
 install_dependencies() { # Функция для установки зависимостей
     log "Обновление зависимостей..."
     if sudo apt-get update && sudo apt-get upgrade -y; then
@@ -265,20 +250,20 @@ request_user_input() { # Функция для запроса параметро
     NAME=$(get_value "Введите ваше имя:" "$NAME")
     EMAIL=$(get_value "Введите ваш email:" "$EMAIL")
     SELECTED_BASIC_DEPS=$(select_group "Выберите зависимости для установки:" BASIC_DEPS)
-    if [[ " ${SELECTED_BASIC_DEPS[@]} " =~ "php" ]]; then
+    if [[ " ${SELECTED_BASIC_DEPS} " =~ "php" ]]; then
         PHP_VERSION=$(select_item "Выберите версию PHP для установки" PHP_VERSIONS "8.2")
     fi
 
-    if [[ " ${SELECTED_BASIC_DEPS[@]} " =~ "nodejs" ]]; then
+    if [[ " ${SELECTED_BASIC_DEPS} " =~ "nodejs" ]]; then
         NODE_VERSION=$(select_item "Выберите версию Node.js для установки" NODE_VERSIONS "22")
     fi
 
-    if [[ " ${SELECTED_BASIC_DEPS[@]} " =~ "mysql" ]]; then
+    if [[ " ${SELECTED_BASIC_DEPS} " =~ "mysql" ]]; then
         LOCAL_MYSQL_USER=$(get_value "Введите имя пользователя для MySQL:" "$LOCAL_MYSQL_USER")
         LOCAL_MYSQL_PASSWORD=$(get_value "Введите имя пользователя для MySQL:" "$LOCAL_MYSQL_PASSWORD")
     fi
 
-    if [[ " ${SELECTED_BASIC_DEPS[@]} " =~ "postgresql" ]]; then
+    if [[ " ${SELECTED_BASIC_DEPS} " =~ "postgresql" ]]; then
         LOCAL_PGSQL_USER=$(get_value "Введите имя пользователя для MySQL:" "$LOCAL_PGSQL_USER")
         LOCAL_PGSQL_PASSWORD=$(get_value "Введите имя пользователя для MySQL:" "$LOCAL_PGSQL_PASSWORD")
     fi
@@ -286,8 +271,7 @@ request_user_input() { # Функция для запроса параметро
 
 install_selected_dependencies() { # Функция для установки выбранных зависимостей
     log "Установка выбранных зависимостей..."
-    log "Выбранные зависимости: ${SELECTED_BASIC_DEPS[@]}"  # Добавьте эту строку
-    for dep in "${SELECTED_BASIC_DEPS[@]}"; do
+    for dep in "${SELECTED_BASIC_DEPS}"; do
         if [[ " $dep " =~ "nodejs" ]]; then
             log "Установка Node.js версии ${NODE_VERSION}..."
             if sudo snap install node --channel="${NODE_VERSION}" --classic; then
